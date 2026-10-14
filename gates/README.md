@@ -154,7 +154,8 @@ contract. Run the Windows (`pwsh …`) **or** the Linux–macOS (`sh …`) form,
 
   **token_ledger — what it measures.**
   - The Stage-4b build plan (`buildPlan.glob`, default `**/*.buildplan.md`) ends in a `## Ledger` table:
-    `| kind | by | for | aud | path | range | hash | full | est | note |`.
+    `| kind | by | for | aud | path | range | hash | full | est | note |`. A `|` inside a cell (a grep
+    alternation, a pinned union type) is written as `\|`, so it renders as a pipe and never splits the row.
   - `add` computes `hash` (`git hash-object`, 7 chars), `full` (whole-file tokens) and `est` (tokens of
     the range / grep window / pasted note; `0` for `skip`; the admitted tokens for `read`), with tokens =
     `ceil(chars × buildPlan.tokensPerChar)` (default `0.25`). It refuses a `qa`-audience row pointing into

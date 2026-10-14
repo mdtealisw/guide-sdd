@@ -427,3 +427,10 @@ No invariant change; still ten. The bank now checks the code beyond the suite.
   - The hook strips the root correctly on non-ASCII paths.
   - Each fix has a smoke negative control on both twins.
 - `flow.html`: an animated flow map (route x host tier x deployment x coverage, plus the gate switches), published on GitHub Pages beside the landing page, which links to it.
+
+## v1.16.1 — ledger cells may hold a pipe (per SDD-amend-v1.16.1, 2026-10-13)
+
+No invariant change; still ten.
+- `token_ledger` (closes #11): `add` wrote a grep pattern with a `|` (alternation) unescaped, so the row split into extra columns; `verify` read part of the pattern as the hash and reported a false STALE (exit 1), and `report` misread `full`/`est`. Now every free-text cell (by, for, path, range, note) is written with `|` as `\|` (tabs and newlines become blanks), and rows split on unescaped pipes only. Escaping is lossless (a literal `\|` round-trips), and GitHub's table rendering shows `\|` as a pipe. A `pin` note keeps its `|` instead of being rewritten to `/`. A 1.16.0 row with a raw `|` in `range` still reads: its last four cells are taken from the right.
+- `token_ledger.ps1` counted grep matches case-insensitively (`-match`), while the sh twin's `grep -E` is case-sensitive, so the twins wrote different `est` values. ps1 now uses `-cmatch`. The sh twin prints `STALE` and `LEDGER` lines with `printf`, so a pattern backslash is not read as an escape under dash.
+- Smoke: a grep alternation, a literal `\|`, a pin note with `|` and a legacy unescaped row all verify current and report identically on both twins.

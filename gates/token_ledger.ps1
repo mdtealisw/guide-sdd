@@ -72,6 +72,10 @@ function Blob([string]$p) { $h = (& git hash-object -- $p 2>$null); if ($h) { re
 function Get-Bytes([string]$p) { return ([System.IO.FileInfo](Resolve-FsPath $p)).Length }
 
 # Rows: data rows of the ledger table -> objects
+$SEP = [string][char]1
+# Cell: a free-text value made safe for one table cell - tabs/newlines to blanks, | escaped as \|.
+function Cell([string]$s) { return (($s -replace '[\t\r\n]', ' ') -replace '\|', '\|') }
+
 function Get-Rows([string]$file) {
     $out = New-Object System.Collections.Generic.List[object]
     $hdr = $false; $n = 0
@@ -81,9 +85,16 @@ function Get-Rows([string]$file) {
             if (-not $hdr) { continue }
             if ($line -match '^\s*\|\s*-+') { continue }
             $n++
-            $f = @($line -split '\|' | ForEach-Object { $_.Trim() })
-            while ($f.Count -lt 12) { $f += '' }
-            $out.Add([pscustomobject]@{ n = $n; kind = $f[1]; by = $f[2]; for = $f[3]; aud = $f[4]; path = $f[5]; range = $f[6]; hash = $f[7]; full = [int]($f[8] -as [int]); est = [int]($f[9] -as [int]); note = $f[10] })
+            # Cells split on unescaped pipes only (add writes | as \|). A pre-1.16.1 row may hold a raw |
+            # in range: the four cells after it are fixed, so they are read from the right.
+            $t = ($line -replace '\\\|', $SEP).Trim()
+            if ($t.StartsWith('|')) { $t = $t.Substring(1) }
+            if ($t.EndsWith('|')) { $t = $t.Substring(0, $t.Length - 1) }
+            $d = @($t -split '\|')
+            if ($d.Count -gt 10) { $d = @($d[0..4]) + @($d[5..($d.Count - 5)] -join '|') + @($d[($d.Count - 4)..($d.Count - 1)]) }
+            $f = @($d | ForEach-Object { $_.Trim().Replace($SEP, '|') })
+            while ($f.Count -lt 10) { $f += '' }
+            $out.Add([pscustomobject]@{ n = $n; kind = $f[0]; by = $f[1]; for = $f[2]; aud = $f[3]; path = $f[4]; range = $f[5]; hash = $f[6]; full = [int]($f[7] -as [int]); est = [int]($f[8] -as [int]); note = $f[9] })
             continue
         }
         if ($line -match '^\s*$') { continue }
@@ -121,7 +132,7 @@ if ($Command -eq 'add') {
             $pat = ($Range -replace '\s*[+±-]+\s*\d+\s*$', '') -replace "^'", '' -replace "'$", ''
             $mm = [regex]::Match($Range, '[+±-]+\s*(\d+)\s*$'); $nctx = if ($mm.Success) { [int]$mm.Groups[1].Value } else { 20 }
             if (-not $pat) { Write-Output "FAIL ${GateName}: -Range for grep is `"'pattern' +/-N`"."; exit 2 }
-            $mcount = @($lines | Where-Object { $_ -match $pat }).Count
+            $mcount = @($lines | Where-Object { $_ -cmatch $pat }).Count
             $v = [math]::Ceiling($mcount * (2 * $nctx + 1) * ($ch / $nl) * $tpc); if ($v -gt $full) { $v = $full }
             $est = [int]$v; $range = "'$pat' +-$nctx"
         }
@@ -141,7 +152,7 @@ if ($Command -eq 'add') {
         }
     }
     $h = Blob $p
-    $note = ($Note -replace '\|', '/') -replace '[\r\n]', ' '
+    $note = Cell $Note
     $utf8 = [System.Text.UTF8Encoding]::new($false)
     $hasHdr = (Test-Path -LiteralPath $Plan) -and ((Read-FileText $Plan) -match '(?m)^\s*\|\s*kind\s*\|')
     if (-not $hasHdr) {
@@ -149,7 +160,7 @@ if ($Command -eq 'add') {
         if ((Test-Path -LiteralPath $Plan) -and (Get-Bytes $Plan) -gt 0) { $pre = "`n" }
         [System.IO.File]::AppendAllText((Resolve-FsPath $Plan), $pre + "## Ledger`n`n| kind | by | for | aud | path | range | hash | full | est | note |`n|---|---|---|---|---|---|---|---|---|---|`n", $utf8)
     }
-    [System.IO.File]::AppendAllText((Resolve-FsPath $Plan), "| $Kind | $By | $For | $Aud | $p | $range | $h | $full | $est | $note |`n", $utf8)
+    [System.IO.File]::AppendAllText((Resolve-FsPath $Plan), "| $Kind | $(Cell $By) | $(Cell $For) | $Aud | $(Cell $p) | $(Cell $range) | $h | $full | $est | $note |`n", $utf8)
     Write-Output "LEDGER ${GateName}: + $Kind $By->$For [$Aud] $p $range est~$(Fmt $est) (full~$(Fmt $full)) @$h"
     exit 0
 }

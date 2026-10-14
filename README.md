@@ -1,6 +1,6 @@
 # GUIDE SDD — Gated, Unified, Intent-Driven Engineering
 
-> **v1.16.0 — 2026-10-07.** A reusable, token-efficient, spec-first / persona-split development
+> **v1.16.1 — 2026-10-13.** A reusable, token-efficient, spec-first / persona-split development
 > method that drops into large, multi-developer projects worked by humans **and** AI agents. It
 > merges two mature in-house practices (Mistwright's *How We Work*, Polars' *How To Develop*) with
 > the published SOTA into one copyable **spine** + a small, indexed **per-project surface**.
@@ -435,6 +435,13 @@ No invariant change; still ten. The bank now checks the code beyond the suite.
   out-of-the-box configuration.
 
 Full record in `constitution.changelog.md`.
+
+### v1.16.1 Amendment — ledger cells may hold a pipe (2026-10-13)
+
+No invariant change; still ten. **`token_ledger`** (closes #11): a `|` in a ledger cell (a grep
+alternation like `'Pushing|Deploy'`, a pinned `string | null`) is written as `\|`. It no longer shifts the
+row's columns, so `verify` stops reporting a false STALE and `report` reads the right numbers. Ledgers
+written by 1.16.0 still read correctly. Full record in `constitution.changelog.md`.
 
 ## Map to the source practices
 

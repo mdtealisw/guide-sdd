@@ -3,7 +3,7 @@
 # run the generic gates (expect PASS), then the NEGATIVE controls — an unfollowed clause (coverage
 # FAIL), every test_edit_ban bypass the v1.12 hardening closed, the v1.13 structure_check controls
 # (planned member missing, removed class present, memberless diagram, diagram edited after freeze) and
-# token_ledger (qa row into code refused, stale row) — then freeze and run the whole bank.
+# token_ledger (qa row into code refused, stale row, | in a cell) — then freeze and run the whole bank.
 #
 # Usage:  pwsh ci/smoke.ps1
 # Needs: git, tar (ships with Windows 10+), pwsh 7. Exit 0 = all expectations met.
@@ -160,6 +160,19 @@ try {
     Expect 1 'token_ledger verify FAIL: stale row after file change' @('gates/token_ledger.ps1', 'verify', '-Plan', $bp, '-For', 'S2', '-Config', $cfg)
     Names 'token_ledger (stale)' 'STALE'
     git checkout -q -- src
+
+    # token_ledger (#11): a | in a cell is written as \| and never splits the row - a grep alternation, a
+    # literal \| and a pin note with | all verify current; a pre-1.16.1 row with a raw | in range still reads.
+    $lp = 'spec/working/pipes.ledger.md'
+    Expect 0 'token_ledger add grep with | (alternation)' @('gates/token_ledger.ps1', 'add', '-Plan', $lp, '-Kind', 'grep', '-By', 'P', '-For', 'S1', '-Path', 'spec/demo.body.md', '-Range', "'DEMO|smoke' +-1", '-Config', $cfg)
+    Expect 0 'token_ledger add grep with literal \|' @('gates/token_ledger.ps1', 'add', '-Plan', $lp, '-Kind', 'grep', '-By', 'P', '-For', 'S1', '-Path', 'spec/demo.body.md', '-Range', "'a\|b' +-1", '-Config', $cfg)
+    Expect 0 'token_ledger add pin with | in note' @('gates/token_ledger.ps1', 'add', '-Plan', $lp, '-Kind', 'pin', '-By', 'P', '-For', 'S1', '-Path', 'spec/demo.body.md', '-Note', 'f(x: string | null): int', '-Config', $cfg)
+    $h = (git hash-object spec/demo.body.md).Substring(0, 7)
+    [IO.File]::AppendAllText("$proj/$lp", "| grep | P | S2 | any | spec/demo.body.md | 'x|y' +-1 | $h | 1 | 1 | legacy |`n", $utf8)
+    Expect 0 'token_ledger verify PASS with | in cells' @('gates/token_ledger.ps1', 'verify', '-Plan', $lp, '-Config', $cfg)
+    Names 'token_ledger (pipes)' '4 ledger row(s) current'
+    Expect 0 'token_ledger report with | in cells' @('gates/token_ledger.ps1', 'report', '-Plan', $lp, '-Config', $cfg)
+    Remove-Item "$proj/$lp"
 
     # Rule engine: a regex is matched line by line (the sh twin's grep -E semantics) - ^ anchors each
     # line, and no match spans a newline. Untracked scratch files, removed before the freeze.

@@ -76,16 +76,28 @@ tok() { awk -v c="$1" -v t="$TPC" 'BEGIN { v = c * t; printf "%d", (v == int(v))
 fmt() { awk -v n="$1" 'BEGIN { if (n >= 1000) printf "%.1fk", n / 1000; else printf "%d", n }'; }
 blob() { git hash-object -- "$1" 2>/dev/null | cut -c1-7; }
 
+# cell <text> -> the text made safe for one table cell: tabs/newlines to blanks, | escaped as \|
+cell() { printf '%s' "$1" | tr '\t\r\n' '   ' | sed 's/|/\\|/g'; }
+
 # rows <plan> -> TSV: n kind by for aud path range hash full est note  (data rows of the ledger table only)
+# Cells split on unescaped pipes only (add writes | as \|). A pre-1.16.1 row may hold a raw | in range:
+# the four cells after it are fixed, so they are read from the right.
 rows() {
-  awk -F'|' '
+  awk '
     /^[[:space:]]*\|/ {
       if ($0 ~ /^[[:space:]]*\|[[:space:]]*kind[[:space:]]*\|/) { hdr = 1; next }
       if (!hdr) next
       if ($0 ~ /^[[:space:]]*\|[[:space:]]*-+/) next
       n++
-      for (i = 2; i <= 11; i++) { v = $i; gsub(/^[[:space:]]+|[[:space:]]+$/, "", v); f[i] = v }
-      printf "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", n, f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11]
+      t = $0; gsub(/\\[|]/, "\001", t)
+      sub(/^[[:space:]]*[|]/, "", t); sub(/[|][[:space:]]*$/, "", t)
+      m = split(t, d, "|")
+      if (m > 10) {
+        r = d[6]; for (i = 7; i <= m - 4; i++) r = r "|" d[i]
+        d[6] = r; for (i = 7; i <= 10; i++) d[i] = d[m - 10 + i]
+      }
+      for (i = 1; i <= 10; i++) { v = (i <= m) ? d[i] : ""; gsub(/^[[:space:]]+|[[:space:]]+$/, "", v); gsub(/\001/, "|", v); f[i] = v }
+      printf "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", n, f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10]
       next
     }
     /^[[:space:]]*$/ { next }
@@ -129,13 +141,12 @@ if [ "$CMD" = add ]; then
           EST=$(tok "$RCH"); RANGE="$R" ;;
   esac
   H=$(blob "$P")
-  NOTE=$(printf '%s' "$NOTE" | tr '|\n\r' '/  ')
   if ! grep -q -E '^[[:space:]]*\|[[:space:]]*kind[[:space:]]*\|' "$PLAN" 2>/dev/null; then
     { [ -f "$PLAN" ] && [ -s "$PLAN" ] && printf '\n'
       printf '## Ledger\n\n| kind | by | for | aud | path | range | hash | full | est | note |\n|---|---|---|---|---|---|---|---|---|---|\n'; } >> "$PLAN"
   fi
-  printf '| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' "$KIND" "$BY" "$FOR" "$AUD" "$P" "$RANGE" "$H" "$FULL" "$EST" "$NOTE" >> "$PLAN"
-  echo "LEDGER $GATE: + $KIND $BY->$FOR [$AUD] $P $RANGE est~$(fmt "$EST") (full~$(fmt "$FULL")) @$H"
+  printf '| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' "$KIND" "$(cell "$BY")" "$(cell "$FOR")" "$AUD" "$(cell "$P")" "$(cell "$RANGE")" "$H" "$FULL" "$EST" "$(cell "$NOTE")" >> "$PLAN"
+  printf '%s\n' "LEDGER $GATE: + $KIND $BY->$FOR [$AUD] $P $RANGE est~$(fmt "$EST") (full~$(fmt "$FULL")) @$H"
   exit 0
 fi
 
@@ -149,7 +160,7 @@ if [ "$CMD" = verify ]; then
     N=$((N+1))
     if [ ! -f "$path" ]; then echo "STALE $GATE: row $n $kind $path (by $by for $for) - file is gone; the row is void."; STALE=$((STALE+1)); continue; fi
     NOW=$(blob "$path")
-    if [ "$NOW" != "$hash" ]; then echo "STALE $GATE: row $n $kind $path $range (by $by for $for) - file changed since written (was @$hash, now @$NOW); re-read before trusting."; STALE=$((STALE+1)); fi
+    if [ "$NOW" != "$hash" ]; then printf '%s\n' "STALE $GATE: row $n $kind $path $range (by $by for $for) - file changed since written (was @$hash, now @$NOW); re-read before trusting."; STALE=$((STALE+1)); fi
   done <<EOF
 $(rows "$PLAN")
 EOF

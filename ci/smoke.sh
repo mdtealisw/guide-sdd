@@ -4,7 +4,7 @@
 # controls — an unfollowed clause (coverage FAIL), every test_edit_ban bypass the v1.12 hardening
 # closed (uncommitted edit, untracked test, rename-out, gate-config tamper, moving base), the v1.13
 # structure_check controls (planned member missing, removed class present, memberless diagram, diagram
-# edited after freeze) and token_ledger (qa row into code refused, stale row) — then freeze and run the
+# edited after freeze) and token_ledger (qa row into code refused, stale row, | in a cell) — then freeze and run the
 # whole bank (expect clean).
 #
 # Usage:  sh ci/smoke.sh [--compare]
@@ -182,6 +182,21 @@ expect 1 "token_ledger verify FAIL: stale row after file change" sh gates/token_
 names "token_ledger (stale)" "STALE"
 twin "token_ledger (stale)" "$LAST_OUT" "$LAST_RC" gates/token_ledger.ps1 verify -Plan $BP -For S2 -Config $CFG
 git checkout -q -- src
+
+# token_ledger (#11): a | in a cell is written as \| and never splits the row - a grep alternation, a
+# literal \| and a pin note with | all verify current; a pre-1.16.1 row with a raw | in range still reads.
+LP=spec/working/pipes.ledger.md
+expect 0 "token_ledger add grep with | (alternation)" sh gates/token_ledger.sh add --plan $LP --kind grep --by P --for S1 --path spec/demo.body.md --range "'DEMO|smoke' +-1" --config $CFG
+twin "token_ledger (add grep |)" "$LAST_OUT" "$LAST_RC" gates/token_ledger.ps1 add -Plan spec/working/pipes.twin.md -Kind grep -By P -For S1 -Path spec/demo.body.md -Range "'DEMO|smoke' +-1" -Config $CFG
+expect 0 "token_ledger add grep with literal \\|" sh gates/token_ledger.sh add --plan $LP --kind grep --by P --for S1 --path spec/demo.body.md --range "'a\\|b' +-1" --config $CFG
+expect 0 "token_ledger add pin with | in note" sh gates/token_ledger.sh add --plan $LP --kind pin --by P --for S1 --path spec/demo.body.md --note "f(x: string | null): int" --config $CFG
+printf '| grep | P | S2 | any | spec/demo.body.md | %s | %s | 1 | 1 | legacy |\n' "'x|y' +-1" "$(git hash-object spec/demo.body.md | cut -c1-7)" >> $LP
+expect 0 "token_ledger verify PASS with | in cells" sh gates/token_ledger.sh verify --plan $LP --config $CFG
+names "token_ledger (pipes)" "4 ledger row(s) current"
+twin "token_ledger (verify pipes)" "$LAST_OUT" "$LAST_RC" gates/token_ledger.ps1 verify -Plan $LP -Config $CFG
+expect 0 "token_ledger report with | in cells" sh gates/token_ledger.sh report --plan $LP --config $CFG
+twin "token_ledger (report pipes)" "$LAST_OUT" "$LAST_RC" gates/token_ledger.ps1 report -Plan $LP -Config $CFG
+rm -f $LP spec/working/pipes.twin.md
 
 # Rule engine (constitution_lint / seam_conformance / qa_import_ban): a regex is matched line by line
 # in both twins - ^ anchors each line, and no match spans a newline. Untracked scratch files, removed
