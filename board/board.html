@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Stage Board</title>
+<style>
+/* GUIDE SDD stage board. Header + tabs; Board = the GUIDE-stage columns (from /api/state columns) for the active sprint;
+   Backlog = epic panel (left, when board.epics is set) + sprint list + ranked backlog list. Issue detail opens in a right drawer. */
+:root{
+  --bg:#f7f8f9; --surface:#ffffff; --sunken:#f1f2f4; --ink:#172b4d; --muted:#626f86; --line:#dcdfe4;
+  --accent:#0c66e4; --accent-ink:#ffffff; --accent-soft:#e9f2ff; --hover:#f1f2f4; --shadow:0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31);
+  --todo-bg:#dcdfe4; --todo-ink:#44546f; --prog-bg:#cce0ff; --prog-ink:#0055cc;
+  --rev-bg:#f8e6a0; --rev-ink:#7f5f01; --done-bg:#baf3db; --done-ink:#216e4e; --flag:#c9372c;
+  --ep-bg-l:90%; --ep-ink-l:30%;
+  --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1d2125; --surface:#22272b; --sunken:#161a1d; --ink:#dee4ea; --muted:#9fadbc; --line:#38414a;
+  --accent:#579dff; --accent-ink:#1d2125; --accent-soft:#1c2b41; --hover:#2c333a; --shadow:0 0 0 1px #38414a;
+  --todo-bg:#38414a; --todo-ink:#b6c2cf; --prog-bg:#09326c; --prog-ink:#85b8ff;
+  --rev-bg:#533f04; --rev-ink:#f5cd47; --done-bg:#164b35; --done-ink:#7ee2b8; --flag:#f87168;
+  --ep-bg-l:24%; --ep-ink-l:82%; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1d2125; --surface:#22272b; --sunken:#161a1d; --ink:#dee4ea; --muted:#9fadbc; --line:#38414a;
+  --accent:#579dff; --accent-ink:#1d2125; --accent-soft:#1c2b41; --hover:#2c333a; --shadow:0 0 0 1px #38414a;
+  --todo-bg:#38414a; --todo-ink:#b6c2cf; --prog-bg:#09326c; --prog-ink:#85b8ff;
+  --rev-bg:#533f04; --rev-ink:#f5cd47; --done-bg:#164b35; --done-ink:#7ee2b8; --flag:#f87168;
+  --ep-bg-l:24%; --ep-ink-l:82%; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.43;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.wrap{max-width:1360px;margin:0 auto}
+.crumb{font-size:13px;color:var(--muted)}
+.ph{display:flex;align-items:center;gap:12px;margin:4px 0 12px;flex-wrap:wrap}
+.pav{width:32px;height:32px;border-radius:4px;background:#1f845a;color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center;flex:none}
+h1{font-size:24px;font-weight:600;margin:0;text-wrap:balance}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:14px;overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 10px;margin-bottom:-2px;border-bottom:2px solid transparent;color:var(--muted);font-weight:500;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.search{width:min(240px,100%);padding:6px 10px;border:2px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);font:inherit}
+.qf{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:4px 10px;font-size:13px;color:var(--muted)}
+.qf[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+.status-note{font-size:12px;color:var(--muted);margin-left:auto}
+/* lozenges */
+.loz{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;padding:0 4px;border-radius:3px;line-height:16px;white-space:nowrap}
+.s-todo{background:var(--todo-bg);color:var(--todo-ink)} .s-progress{background:var(--prog-bg);color:var(--prog-ink)}
+.s-review{background:var(--rev-bg);color:var(--rev-ink)} .s-done{background:var(--done-bg);color:var(--done-ink)}
+.epic{display:inline-block;font-size:11px;font-weight:600;padding:0 5px;border-radius:3px;line-height:16px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.key{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.pts{display:inline-grid;place-items:center;min-width:22px;height:18px;padding:0 5px;border-radius:9px;background:var(--todo-bg);color:var(--todo-ink);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.ty{width:16px;height:16px;border-radius:3px;display:inline-grid;place-items:center;flex:none;color:#fff;font-size:10px;font-weight:700}
+.ty.story{background:#22a06b} .ty.bug{background:#e2483d} .ty.task{background:#1d7afc}
+.flag{color:var(--flag);font-size:12px;font-weight:600}
+/* board */
+.sprint-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.sprint-h h2{font-size:18px;margin:0;font-weight:600}
+.sprint-h span{font-size:13px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(var(--ncol,7),minmax(172px,1fr));gap:10px;align-items:start;overflow-x:auto;padding-bottom:4px}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr);overflow-x:visible}}
+.col{background:var(--sunken);border-radius:6px;padding:8px;min-height:120px}
+.col.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.col h3{font-size:12px;font-weight:600;text-transform:uppercase;color:var(--muted);margin:2px 4px 8px;display:flex;justify-content:space-between;gap:6px}
+.col h3 small{display:block;font-size:11px;font-weight:400;text-transform:none;margin-top:1px}
+.stg{font-size:10.5px;font-weight:600;padding:0 5px;border-radius:3px;line-height:16px;white-space:nowrap;background:var(--sunken);color:var(--muted);border:1px solid var(--line)}
+.card{background:var(--surface);border-radius:4px;box-shadow:var(--shadow);padding:8px 10px;margin-bottom:6px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.card:hover{background:var(--hover)}
+.card .t{font-size:14px;overflow-wrap:anywhere}
+.card .m{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card .m .grow{flex:1}
+.card .lane{font-family:var(--mono);font-size:10.5px;color:var(--muted);overflow-wrap:anywhere}
+.card[draggable="true"]{cursor:grab}
+/* backlog */
+.bl{display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px;align-items:start}
+.bl.noepics{grid-template-columns:minmax(0,1fr)}
+@media (max-width:900px){.bl{grid-template-columns:minmax(0,1fr)}}
+.epics{background:var(--surface);border-radius:6px;box-shadow:var(--shadow);padding:8px}
+.epics h3{font-size:12px;text-transform:uppercase;color:var(--muted);margin:4px 6px 6px}
+.epics ul{list-style:none;margin:0;padding:0}
+@media (max-width:900px){.epics ul{display:flex;flex-wrap:wrap;gap:4px}}
+.epics button{width:100%;border:0;background:none;text-align:left;padding:6px;border-radius:4px;display:flex;flex-direction:column;gap:3px}
+.epics button:hover{background:var(--hover)}
+.epics button[aria-pressed="true"]{background:var(--accent-soft)}
+@media (max-width:900px){.epics button{width:auto}}
+.epics .en{font-size:13px;font-weight:500}
+.epics .ec{font-size:11.5px;color:var(--muted)}
+.prog{height:4px;border-radius:2px;background:var(--todo-bg);overflow:hidden;display:flex}
+.prog i{display:block;height:100%}
+.sec{background:var(--surface);border-radius:6px;box-shadow:var(--shadow);margin-bottom:14px}
+.sec>summary{list-style:none;padding:10px 12px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;cursor:pointer}
+.sec>summary::-webkit-details-marker{display:none}
+.sec>summary h2{font-size:15px;margin:0;font-weight:600}
+.sec>summary span{font-size:12.5px;color:var(--muted)}
+.rows{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:16px 76px minmax(0,1fr) auto auto auto auto auto;gap:8px;align-items:center;padding:6px 12px;cursor:pointer}
+.row+.row{border-top:1px solid var(--line)}
+.row:hover{background:var(--hover)}
+.row .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .act{border:1px solid var(--line);background:var(--surface);border-radius:3px;font-size:12px;padding:1px 8px;color:var(--muted)}
+.row .act:hover{color:var(--ink);border-color:var(--muted)}
+.row .act:disabled{opacity:.5;cursor:default}
+@media (max-width:640px){.row{grid-template-columns:16px minmax(0,1fr) auto;row-gap:4px}
+  .row .key{grid-column:2}.row .t{grid-column:1/-1;white-space:normal}.row .epic,.row .loz,.row .pts,.row .act,.row .asg{grid-row:auto}}
+.empty{padding:16px 12px;color:var(--muted);font-size:13px}
+.more{display:block;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:8px;color:var(--accent);font-weight:500}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(9,30,66,.4);z-index:5}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--surface);z-index:6;box-shadow:-4px 0 16px rgba(0,0,0,.2);
+  display:flex;flex-direction:column;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px 16px;overflow-y:auto}
+.drawer .dh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.drawer .x{border:0;background:none;font-size:20px;line-height:1;padding:4px 8px;border-radius:4px;color:var(--muted)}
+.drawer .x:hover{background:var(--hover)}
+.drawer h2{font-size:20px;font-weight:600;margin:10px 0 14px;overflow-wrap:anywhere}
+.drawer dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px 12px;margin:0 0 16px;font-size:13px}
+.drawer dt{color:var(--muted);font-weight:600}
+.drawer dd{margin:0;overflow-wrap:anywhere}
+.drawer .desc{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.drawer select{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink)}
+.drawer .btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.btn{border:0;border-radius:3px;padding:6px 12px;font-weight:500;background:var(--sunken);color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.drawer h4{font-size:12px;text-transform:uppercase;color:var(--muted);margin:6px 0}
+/* teams: each team is one Claude session; the chip bar filters every view to that team's board */
+.teams{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-4px 0 14px}
+.teams .lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-right:2px}
+.tchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:2px 10px 2px 3px;font-size:13px}
+.tchip.plain{padding-left:10px}
+.tchip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:500}
+.tchip .n{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.av{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;flex:none;font-size:10.5px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 45%)}
+.av.none{background:var(--todo-bg);color:var(--todo-ink)}
+.tadd{display:inline-flex;gap:4px}
+.tadd input{width:110px;padding:3px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+.tadd button{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:2px 10px;font-size:13px;color:var(--muted)}
+.vt{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:4px 10px;font-size:13px;color:var(--muted)}
+.vt[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+.lane-h{display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;font-weight:600}
+.lane-h:first-child{margin-top:0}
+.lane-h span.s{font-size:12.5px;font-weight:400;color:var(--muted)}
+.asg{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink);max-width:110px}
+[hidden]{display:none!important}
+</style>
+</head><body>
+<div class="wrap">
+  <div class="crumb">GUIDE SDD / Stage board</div>
+  <div class="ph"><div class="pav" id="pav" aria-hidden="true">B</div><h1 id="ptitle">Board</h1></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-board" aria-selected="true" data-tab="board">Board</button>
+    <button role="tab" id="tab-backlog" aria-selected="false" data-tab="backlog">Backlog</button>
+  </div>
+  <div class="teams" role="group" aria-label="Teams"><span class="lbl">Teams</span><span id="tchips" style="display:contents"></span><form class="tadd" id="taddf" hidden><input id="tname" placeholder="New team" aria-label="New team name" maxlength="24" autocomplete="off"><button type="submit">Add team</button></form></div>
+  <div class="toolbar">
+    <input class="search" id="q" type="search" placeholder="Search issues" aria-label="Search issues">
+    <span id="qfs"></span>
+    <button class="vt" id="swim" aria-pressed="false">Swimlanes by team</button>
+    <span class="status-note" id="conn">Connecting…</span>
+  </div>
+
+  <section id="v-board">
+    <div class="sprint-h"><h2 id="bhead">Active sprint</h2><span id="bsum"></span></div>
+    <div id="cols"></div>
+  </section>
+
+  <section id="v-backlog" hidden>
+    <div class="bl" id="bl">
+      <nav class="epics" aria-label="Epics"><h3>Epics</h3><ul id="epics"></ul></nav>
+      <div>
+        <details class="sec" open><summary><h2>Active sprint</h2><span id="ssum"></span></summary><ul class="rows" id="srows"></ul></details>
+        <details class="sec" open><summary><h2>Backlog</h2><span id="bls"></span></summary><ul class="rows" id="brows"></ul><button class="more" id="bmore" hidden>Show more</button></details>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" hidden></aside>
+<!--snapshot-->
+<script>
+/* Catalog: open backlog.md rows + keys already closed there; comes from /api/state (or the embedded snapshot). */
+let ITEMS=[];
+let BY_KEY={};
+let SHIPPED=new Set(); let catLive=false;
+function setCatalog(c){if(!c||!Array.isArray(c.items))return;ITEMS=c.items.map(i=>({...i,id:i.k}));BY_KEY=Object.fromEntries(ITEMS.map(i=>[i.k,i]));SHIPPED=new Set(c.shipped||[]);catLive=true}
+let EPICS=[]; /* [id,name,desc] from /api/state epics (board.epics) */
+
+let EPIC_NAME={},EPIC_HUE={},HAS_META=false,TITLE="Board";
+function setEpics(list){EPICS=(list||[]).map(e=>[String(e.id),String(e.name||e.id),String(e.desc||"")]);
+  EPIC_NAME=Object.fromEntries(EPICS.map(e=>[e[0],e[1]]));EPIC_HUE=Object.fromEntries(EPICS.map((e,ix)=>[e[0],Math.round(ix*360/EPICS.length+200)%360]))}
+const BL={r:"Ready",p:"Needs PO",e:"Eyeball",k:"Parked",f:"In flight"};
+const PTS={S:1,M:3,L:8,XL:20};
+/* Columns + stages come from /api/state (board.mjs defines them once). */
+let COLS=[]; let STAGES=[];
+const LOZ={todo:"s-todo",triage:"s-progress",spec:"s-progress",qa:"s-progress",eng:"s-progress",ship:"s-review",done:"s-done"};
+const colOfStage=st=>(COLS.find(c=>c.stages.includes(st))||{id:"todo"}).id;
+const stageLabel=st=>(STAGES.find(x=>x.id===st)||{label:st}).label;
+const stageChip=st=>/^[0-9]/.test(st)?`<span class="stg" title="SDD stage ${esc(st)}">S${esc(st)} ${esc(stageLabel(st))}</span>`:"";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sprint=[]; let writable=false; let tab="board"; let epicF=null; let shown=80; let openKey=null; let lastFocus=null;
+let filt={q:"",st:{r:true,p:true,e:true,f:true,k:false}};
+let teams=[]; let teamF=null; let swim=false; let hashTeam=(location.hash||"").slice(1).toLowerCase()||null;
+try{const s=JSON.parse(localStorage.getItem("guide-board.f")||"null");if(s&&s.st)filt.st={...filt.st,...s.st};if(s&&s.team)teamF=s.team;if(s&&s.swim)swim=true;const t=localStorage.getItem("guide-board.tab");if(t==="board"||t==="backlog")tab=t}catch(e){}
+function persist(){try{localStorage.setItem("guide-board.f",JSON.stringify({st:filt.st,team:teamF,swim}));localStorage.setItem("guide-board.tab",tab)}catch(e){}}
+/* Teams: a team is one orchestrator session (Alpha, Beta…). A sprint issue's `team` field names its owner;
+   that session works the issues where team == its id. Filtering by a team IS that team's board. */
+function teamOf(d){return d&&d.team?teams.find(t=>t.id===d.team)||null:null}
+function hueOf(t){return typeof t.hue==="number"?t.hue:[...t.id].reduce((a,c)=>a+c.charCodeAt(0)*37,0)%360}
+function av(t){return t?`<span class="av" style="--h:${hueOf(t)}" title="${esc(t.name)}" aria-hidden="true">${esc((t.name||t.id).charAt(0).toUpperCase())}</span>`:`<span class="av none" title="Unassigned" aria-hidden="true">?</span>`}
+function teamMatch(d){return !teamF||(teamF==="_none"?!teamOf(d):d.team===teamF)}
+function realTeam(){return teamF&&teamF!=="_none"&&teams.some(t=>t.id===teamF)?teamF:""}
+function asgSelect(d,id){return `<select class="asg" ${id?`id="${id}"`:""} ${d?`data-asg="${esc(d.id)}"`:""} ${writable?"":"disabled"} aria-label="Team">
+  <option value="">Unassigned</option>${teams.map(t=>`<option value="${esc(t.id)}" ${(d?d.team:realTeam())===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select>`}
+
+function issue(k){return BY_KEY[k]||{k,t:k,s:"",e:"",f:"",st:"r"}}
+function typeOf(i){return /\b(red|bug|dupe|stuck|lost|broken|leak|fails?|regression)\b/i.test(i.t)?"bug":i.f==="S"?"task":"story"}
+function tyIcon(i){const t=typeOf(i);return `<span class="ty ${t}" title="${t==="bug"?"Bug":t==="task"?"Task":"Story"}" aria-label="${t}">${t==="bug"?"●":t==="task"?"✓":"▮"}</span>`}
+function epicLoz(e){if(!e||!EPICS.length)return "";const h=EPIC_HUE[e]??210;return `<span class="epic" style="background:hsl(${h} 70% var(--ep-bg-l));color:hsl(${h} 60% var(--ep-ink-l))">${esc(EPIC_NAME[e]||e)}</span>`}
+function stageOf(d){
+  if(d.done||SHIPPED.has(d.k))return "done";
+  return STAGES.some(x=>x.id===d.stage)?d.stage:"todo";
+}
+function statusOf(d){return colOfStage(stageOf(d))}
+function flagOf(d){if(d.done||SHIPPED.has(d.k))return "";if(catLive&&!BY_KEY[d.k])return "Not in the backlog";if(d.flag)return d.flag;const s=(d.state||"").toLowerCase();return /park|held|blocked|watch|not reproduced/.test(s)?d.state:""}
+function inSprint(k){return sprint.find(d=>d.k===k)}
+function ordered(){return [...sprint].sort((a,b)=>(a.order||0)-(b.order||0)||(a.addedAt||0)-(b.addedAt||0))}
+function matchQ(i){if(!filt.q)return true;const q=filt.q.toLowerCase();return (i.k+" "+i.t+" "+(i.s||"")).toLowerCase().includes(q)}
+
+function pts(i){return HAS_META?`<span class="pts">${PTS[i.f]||"–"}</span>`:""}
+function renderQf(){
+  if(!HAS_META){$("qfs").innerHTML="";return}
+  $("qfs").innerHTML=Object.entries(BL).map(([k,n])=>`<button class="qf" data-qf="${k}" aria-pressed="${filt.st[k]}">${n}</button>`).join(" ");
+}
+function renderTeams(){
+  const open=sprint.filter(d=>!d.done),cnt=f=>open.filter(f).length;
+  $("tchips").innerHTML=`<button class="tchip plain" data-team="" aria-pressed="${!teamF}">All <span class="n">${open.length}</span></button>`+
+    teams.map(t=>`<button class="tchip" data-team="${esc(t.id)}" aria-pressed="${teamF===t.id}">${av(t)}${esc(t.name)} <span class="n">${cnt(d=>d.team===t.id)}</span></button>`).join("")+
+    `<button class="tchip" data-team="_none" aria-pressed="${teamF==="_none"}">${av(null)}Unassigned <span class="n">${cnt(d=>!teamOf(d))}</span></button>`;
+  $("taddf").hidden=!writable;
+  $("swim").setAttribute("aria-pressed",swim);$("swim").hidden=!!teamF||tab!=="board";
+}
+const ptsOf=a=>a.reduce((s,d)=>s+(PTS[issue(d.k).f]||0),0);
+function colsHtml(list,lane){
+  const by=Object.fromEntries(COLS.map(c=>[c.id,[]]));
+  list.forEach(d=>by[statusOf(d)].push(d));
+  if(by.done)by.done.sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+  return `<div class="cols" style="--ncol:${COLS.length}">`+COLS.map(({id:c,label:n,actor})=>`<div class="col" data-col="${c}" ${lane!==undefined?`data-lane="${esc(lane)}"`:""} aria-label="${esc(n)}"><h3><span>${esc(n)}<small>${esc(actor)}</small></span><span>${by[c].length}</span></h3>${
+    by[c].map(d=>{const i=issue(d.k);const fl=flagOf(d);return `<div class="card" tabindex="0" role="button" data-open="${esc(d.k)}" data-id="${esc(d.id)}" ${writable?'draggable="true"':""}>
+      <div class="t">${esc(i.t)}</div>
+      ${fl?`<div class="flag">⚑ ${esc(fl)}</div>`:(d.state&&d.state!=="queued"&&c!=="done"?`<div class="lane">${esc(d.state)}</div>`:"")}
+      <div class="m">${epicLoz(i.e)}<span class="grow"></span>${tyIcon(i)}<span class="key">${esc(i.k)}</span>${stageChip(stageOf(d))}${pts(i)}${av(teamOf(d))}</div></div>`}).join("")}</div>`).join("")+`</div>`;
+}
+function renderBoard(){
+  const all=ordered().filter(d=>matchQ(issue(d.k))&&teamMatch(d));
+  const open=all.filter(d=>statusOf(d)!=="done"),done=all.length-open.length;
+  const t=teamF==="_none"?null:teamOf({team:teamF});
+  $("bhead").textContent=t?`${t.name} · active sprint`:teamF==="_none"?"Unassigned · active sprint":"Active sprint";
+  $("bsum").textContent=`${open.length} open · ${done} done`+(HAS_META?` · ${ptsOf(open)} points remaining`:"");
+  if(!swim||teamF){$("cols").innerHTML=colsHtml(all);return}
+  const lanes=[...teams.map(t=>[t,all.filter(d=>d.team===t.id)]),[null,all.filter(d=>!teamOf(d))]].filter(([t,l])=>l.length||t);
+  $("cols").innerHTML=lanes.map(([t,l])=>{const o=l.filter(d=>statusOf(d)!=="done");
+    return `<div class="lane-h">${av(t)}${esc(t?t.name:"Unassigned")} <span class="s">${o.length} open${HAS_META?` · ${ptsOf(o)} points`:""}</span></div>`+colsHtml(l,t?t.id:"")}).join("");
+}
+function rowHtml(i,d){
+  const st=d?statusOf(d):null;
+  const loz=d?`<span class="loz ${LOZ[st]}">${esc(stageLabel(stageOf(d)))}</span>`:`<span class="loz s-todo">${BL[i.st]||""}</span>`;
+  const rt=teams.find(t=>t.id===realTeam());
+  const act=d?(st==="done"?`<span></span>`:`<button class="act" data-rm="${esc(d.id)}" ${writable?"":"disabled"} aria-label="Remove ${esc(i.k)} from sprint">Remove</button>`)
+             :`<button class="act" data-add="${esc(i.k)}" ${writable?"":"disabled"} aria-label="Add ${esc(i.k)} to ${rt?esc(rt.name)+"'s board":"sprint"}">+ ${rt?esc(rt.name):"Sprint"}</button>`;
+  return `<li class="row" tabindex="0" data-open="${esc(i.k)}">${tyIcon(i)}<span class="key">${esc(i.k)}</span><span class="t">${esc(i.t)}</span>${epicLoz(i.e)}${loz}${pts(i)}${d?asgSelect(d):"<span></span>"}${act}</li>`;
+}
+function renderBacklog(){
+  const open=ordered().filter(d=>!d.done&&teamMatch(d));
+  const sp=open.filter(d=>{const i=issue(d.k);return matchQ(i)&&(!epicF||i.e===epicF)});
+  const done=sprint.filter(d=>d.done&&teamMatch(d)).length;
+  const t=teamF==="_none"?null:teamOf({team:teamF});
+  document.querySelector("#v-backlog .sec summary h2").textContent=t?`${t.name} · active sprint`:teamF==="_none"?"Unassigned · active sprint":"Active sprint";
+  $("ssum").textContent=`${open.length} open issues`+(HAS_META?` · ${ptsOf(open)} points`:"")+` · ${done} done (on the Board)`;
+  $("srows").innerHTML=sp.map(d=>rowHtml(issue(d.k),d)).join("")||`<li class="empty">No open sprint issues match.</li>`;
+  const rank={r:0,f:1,p:2,e:3,k:4},eff=["S","M","L","XL"];
+  const bl=ITEMS.filter(i=>!inSprint(i.k)&&(!HAS_META||filt.st[i.st])&&matchQ(i)&&(!epicF||i.e===epicF))
+    .sort((a,b)=>rank[a.st]-rank[b.st]||eff.indexOf(a.f)-eff.indexOf(b.f));
+  $("bls").textContent=`${bl.length} issues`+(HAS_META?` · ${bl.reduce((s,i)=>s+(PTS[i.f]||0),0)} points`:"");
+  $("brows").innerHTML=bl.slice(0,shown).map(i=>rowHtml(i,null)).join("")||`<li class="empty">No backlog issues match the filters.</li>`;
+  $("bmore").hidden=bl.length<=shown; $("bmore").textContent=`Show ${Math.min(80,bl.length-shown)} more`;
+  $("bl").classList.toggle("noepics",!EPICS.length);document.querySelector(".epics").hidden=!EPICS.length;
+  $("epics").innerHTML=`<li><button data-epic="" aria-pressed="${!epicF}"><span class="en">All issues</span><span class="ec">${ITEMS.length} issues</span></button></li>`+
+    EPICS.map(([c,n])=>{const all=ITEMS.filter(i=>i.e===c);const inS=sprint.filter(d=>issue(d.k).e===c);const dn=inS.filter(d=>d.done).length;
+      const pDone=all.length?dn/all.length*100:0,pIn=all.length?(inS.length-dn)/all.length*100:0;
+      return `<li><button data-epic="${c}" aria-pressed="${epicF===c}"><span class="en">${epicLoz(c)}</span><span class="ec">${all.length} issues · ${dn} done in sprint</span>
+        <span class="prog" aria-hidden="true"><i style="width:${pDone}%;background:var(--done-ink)"></i><i style="width:${pIn}%;background:var(--prog-ink)"></i></span></button></li>`}).join("");
+}
+function renderDrawer(){
+  const dr=$("drawer");
+  if(!openKey){dr.hidden=true;$("scrim").hidden=true;return}
+  const i=issue(openKey),d=inSprint(openKey),st=d?statusOf(d):null,sg=d?stageOf(d):null,fl=d?flagOf(d):"";
+  dr.innerHTML=`<div class="dh"><span>${tyIcon(i)} <span class="key">${esc(i.k)}</span></span><button class="x" id="dclose" aria-label="Close">×</button></div>
+    <h2 id="dtitle">${esc(i.t)}</h2>
+    <div class="btns">${d?`<label class="sr">Stage <select id="dstatus" ${writable?"":"disabled"}>${COLS.map(c=>`<optgroup label="${esc(c.label)}">${c.stages.map(x=>`<option value="${esc(x)}" ${x===sg?"selected":""}>${esc(x==="todo"||x==="done"?stageLabel(x):"S"+x+" "+stageLabel(x))}</option>`).join("")}</optgroup>`).join("")}</select></label>
+      ${st!=="done"?`<button class="btn" data-rm="${esc(d.id)}" ${writable?"":"disabled"}>Remove from sprint</button>`:""}`
+      :`<label>Team ${asgSelect(null,"dnew")}</label><button class="btn primary" data-add="${esc(i.k)}" ${writable?"":"disabled"}>Add to sprint</button>`}</div>
+    <dl>${d?`<dt>Team</dt><dd>${av(teamOf(d))} ${asgSelect(d,"dasg")}</dd>`:""}
+      ${EPICS.length&&i.e?`<dt>Epic</dt><dd>${epicLoz(i.e)}</dd>`:""}
+      ${HAS_META&&i.f?`<dt>Story points</dt><dd>${PTS[i.f]||"–"} <span class="key">(${esc(i.f)})</span></dd>`:""}
+      ${HAS_META?`<dt>Backlog status</dt><dd>${esc(BL[i.st]||"")}</dd>`:""}
+      ${d?`<dt>Sprint stage</dt><dd><span class="loz ${LOZ[st]}">${esc(stageLabel(sg))}</span></dd>`:""}
+      ${fl?`<dt>Flagged</dt><dd class="flag">⚑ ${esc(fl)}</dd>`:""}
+      ${d&&d.state&&d.state!=="queued"?`<dt>Latest note</dt><dd>${esc(d.state)}</dd>`:""}
+      ${d&&d.lane?`<dt>Worktree / ship</dt><dd class="key">${esc(d.lane)}</dd>`:""}</dl>
+    <h4>Description</h4><div class="desc">${esc(i.s||"No description.")}</div>`;
+  dr.hidden=false;$("scrim").hidden=false;
+}
+function render(){
+  $("tab-board").setAttribute("aria-selected",tab==="board");$("tab-backlog").setAttribute("aria-selected",tab==="backlog");
+  $("v-board").hidden=tab!=="board";$("v-backlog").hidden=tab!=="backlog";
+  renderQf(); renderTeams(); if(tab==="board")renderBoard(); else renderBacklog(); renderDrawer();
+}
+function applyHash(){if(hashTeam&&(hashTeam==="_none"||teams.some(t=>t.id===hashTeam))){teamF=hashTeam;hashTeam=null;persist()}}
+function openIssue(k){lastFocus=document.activeElement;openKey=k;renderDrawer();const x=$("dclose");if(x)x.focus()}
+function closeIssue(){openKey=null;renderDrawer();if(lastFocus&&document.contains(lastFocus))lastFocus.focus()}
+function note(m){$("conn").textContent=m}
+var api=async function(){};
+async function op(o,...args){const r=await api(o,args);if(r&&r.ok===false)note(r.message||"refused")}
+async function setStatus(id,st,team){await op("stage",id,st);if(team!==undefined)await op("assign",id,team||"none")}
+async function setTeam(id,team){await op("assign",id,team||"none")}
+async function addKey(k,team){if(inSprint(k))return;await op("add",k,...(team?[team]:[]))}
+async function addTeam(name){
+  const id=name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  if(!id)return;
+  if(teams.some(t=>t.id===id)){note(`A team called ${name} already exists.`);return}
+  await op("team-add",name);$("tname").value="";
+}
+async function removeId(id){await op("remove",id)}
+
+document.addEventListener("click",e=>{
+  if(e.target.closest("select,label,form"))return;
+  const b=e.target.closest("button");
+  if(b){
+    if(b.dataset.team!==undefined){teamF=b.dataset.team||null;persist();shown=80;render();return}
+    if(b.id==="swim"){swim=!swim;persist();render();return}
+    if(b.dataset.add){e.stopPropagation();b.disabled=true;const dn=b.closest("#drawer")&&$("dnew");addKey(b.dataset.add,dn?dn.value:realTeam());return}
+    if(b.dataset.tab){tab=b.dataset.tab;persist();render();return}
+    if(b.dataset.qf){filt.st[b.dataset.qf]=!filt.st[b.dataset.qf];persist();shown=80;render();return}
+    if(b.dataset.epic!==undefined){epicF=b.dataset.epic||null;shown=80;renderBacklog();return}
+    if(b.dataset.add){e.stopPropagation();b.disabled=true;addKey(b.dataset.add);return}
+    if(b.dataset.rm){e.stopPropagation();b.disabled=true;removeId(b.dataset.rm);return}
+    if(b.id==="bmore"){shown+=80;renderBacklog();return}
+    if(b.id==="dclose"){closeIssue();return}
+  }
+  const o=e.target.closest("[data-open]");if(o){openIssue(o.dataset.open);return}
+  if(e.target.id==="scrim")closeIssue();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&openKey){closeIssue();return}
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches("[data-open]")&&!e.target.closest("button")){e.preventDefault();openIssue(e.target.dataset.open)}
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="dstatus"){const d=inSprint(openKey);if(d)setStatus(d.id,e.target.value);return}
+  if(e.target.dataset&&e.target.dataset.asg)setTeam(e.target.dataset.asg,e.target.value);
+});
+$("taddf").addEventListener("submit",e=>{e.preventDefault();const n=$("tname").value.trim();if(n)addTeam(n)});
+window.addEventListener("hashchange",()=>{hashTeam=(location.hash||"").slice(1).toLowerCase()||null;applyHash();render()});
+$("q").addEventListener("input",e=>{filt.q=e.target.value.trim();shown=80;render()});
+let dragId=null;
+document.addEventListener("dragstart",e=>{const c=e.target.closest&&e.target.closest(".card");if(!c)return;dragId=c.dataset.id;e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",dragId)}catch(x){}});
+document.addEventListener("dragover",e=>{const col=e.target.closest&&e.target.closest(".col");if(!col||!dragId)return;e.preventDefault();document.querySelectorAll(".col.over").forEach(x=>x!==col&&x.classList.remove("over"));col.classList.add("over")});
+document.addEventListener("dragleave",e=>{const col=e.target.closest&&e.target.closest(".col");if(col&&!col.contains(e.relatedTarget))col.classList.remove("over")});
+document.addEventListener("drop",e=>{const col=e.target.closest&&e.target.closest(".col");if(!col||!dragId)return;e.preventDefault();col.classList.remove("over");const d=sprint.find(x=>x.id===dragId);if(d){const ln=col.dataset.lane;const tm=ln!==undefined&&ln!==(teamOf(d)?d.team:"")?ln:undefined;if(statusOf(d)!==col.dataset.col||tm!==undefined){const c=COLS.find(x=>x.id===col.dataset.col);const tgt=statusOf(d)===col.dataset.col?stageOf(d):c.defaultStage;setStatus(dragId,tgt,tm)}}dragId=null});
+document.addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(".col.over").forEach(x=>x.classList.remove("over"))});
+
+function applyState(s){
+  if(s.error){note(s.error);return}
+  COLS=s.columns||COLS;STAGES=s.stages||STAGES;setEpics(s.epics);HAS_META=!!s.hasMeta;
+  TITLE=s.title||TITLE;document.title=TITLE+" · board";$("ptitle").textContent=TITLE;$("pav").textContent=(TITLE.match(/[A-Za-z0-9]/g)||["B"]).slice(0,2).join("").toUpperCase();
+  sprint=(s.items||[]).map(d=>({...d,id:d.k,done:d.stage==="done"}));
+  teams=(s.teams||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0));
+  setCatalog({items:s.catalog||[],shipped:s.shipped||[]});
+  applyHash();render();
+}
+render();
+const snapEl=document.getElementById("snapshot");
+if(snapEl){
+  const s=JSON.parse(snapEl.textContent);
+  writable=false;applyState(s);
+  note("Snapshot "+new Date(s.snapshotAt||Date.now()).toLocaleString()+" — read-only");
+}else{
+/*LIVE-START*/
+api=async function(o,args){
+  try{const r=await fetch("/api/op",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({op:o,args})});
+    const j=await r.json();if(j.ok)await load();return j}
+  catch(e){return {ok:false,message:"Couldn't reach the board server: "+(e&&e.message||"error")}}
+};
+async function load(){
+  const s=await (await fetch("/api/state",{cache:"no-store"})).json();
+  writable=!s.error;applyState(s);if(!s.error)note("Live");
+}
+function connect(){
+  const es=new EventSource("/api/events");
+  es.addEventListener("changed",()=>{load().catch(()=>{})});
+  es.addEventListener("reload",()=>{location.reload()});
+  es.onopen=()=>{load().catch(()=>{})};
+  es.onerror=()=>{writable=false;note("Server unreachable — start: node sdd/board/serve.mjs");render()};
+}
+load().catch(()=>{note("Server unreachable — start: node sdd/board/serve.mjs")});
+connect();
+/*LIVE-END*/
+}
+</script>
+</body></html>

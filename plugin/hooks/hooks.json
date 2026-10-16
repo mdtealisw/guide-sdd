@@ -21,6 +21,16 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/persona-guard.sh\" --pre"
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/board-dispatch.sh\"",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUse": [

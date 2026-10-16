@@ -4,8 +4,8 @@
 #
 # Order (Stage 7 ship):
 #   link_check -> prose_check -> coverage_check -> test_edit_ban -> structure_check -> static_check
-#     -> suite_green -> constitution_lint* -> seam_conformance* -> qa_import_ban* -> mutation_check
-#     -> fold_check
+#     -> suite_green -> constitution_lint* -> seam_conformance* -> qa_import_ban* -> board_check
+#     -> mutation_check -> fold_check
 #     -> suite_green (re-run)
 # (*) project gates run only if their concrete (non-template) .sh script exists - a fresh
 #     repo is green before you author them.
@@ -142,6 +142,9 @@ if [ -f "$HERE/qa_import_ban.sh" ]; then
 else
   echo "== qa_import_ban == (skipped: cp qa_import_ban.template.sh qa_import_ban.sh)"
 fi
+
+echo "== board_check =="
+bash "$HERE/board_check.sh" --config "$CFG" || fail board_check
 
 echo "== mutation_check =="
 if [ -n "$BASE" ]; then

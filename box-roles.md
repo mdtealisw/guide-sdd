@@ -131,6 +131,18 @@ below; tune in Project Details).
 merge-train (`stages/7_ship.md` §6): that single owner is the cross-machine serialization point. In a
 **solo deployment** the same box runs Validation + merge inline at Stage 7.
 
+## Teams — several orchestrator sessions on one box (optional)
+
+Separate from worker boxes (#CL-6..#CL-10): one PO box running several orchestrator sessions at once,
+each a named **team**, coordinated through the stage board (`board/README.md`, `project-details.md#CL-13`).
+
+- A session takes its team from the PO's start prompt ("you are Alpha"); with none, it handles
+  unassigned work only.
+- A team works only items whose board `team` is its id, in board order (`/board get <team>`). It never
+  claims, edits or reassigns another team's items, and does not take an unassigned item unless the PO
+  says so. The PO assigns, on the live board or by telling a session.
+- Every dispatch brief carries one `Board: <KEY>` line, so the board shows which persona holds the item.
+
 ## At a glance
 
 - Know your box role **before** you touch a Ready item.

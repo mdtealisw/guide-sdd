@@ -124,6 +124,9 @@ mkdir -p backlog                            # SKIP in Mode A (the tracker is the
   `.cursor/commands/`.
 - Tier-B/C host with no slash-commands: skip the copy and run the rituals by hand from
   `session-lifecycle.md`. See `sdd/commands/README.md`.
+- **Stage board (optional, Mode B, needs node ≥ 18):** set `board.file` in the gate config, run
+  `node sdd/board/board.mjs init`, commit the board, start the live view (`sdd/board/README.md`: one
+  Docker command or the IIS script) and fill `#CL-12` (+ `#CL-13` for teams). Skip in Mode A.
 
 ## 3. ASK: spec format (C5)
 

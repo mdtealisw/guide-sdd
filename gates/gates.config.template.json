@@ -39,6 +39,25 @@
     "backlogRoot": "backlog",
     "resolveCmd": null
   },
+  "board": {
+    "_comment": "Optional stage board (board/README.md): sprint membership, GUIDE stage and team per backlog item, in a git-tracked JSON file. file unset = off (board_check: not configured; Mode A uses the tracker's own board). The backlog is foldCheck.backlogRoot (a directory of item files, or one file of rows); store.root overrides it, store.closed names a completed-rows file to move shipped rows into. Stage ids come from PROCESS.md's Stage Index; stageLabels and columns shape the board; dispatch maps a persona's subagent_type to the stage the plugin hook sets when it is dispatched with a 'Board: <KEY>' brief line. meta (optional) = a JSON file of {KEY: {e: epic, f: S|M|L|XL, st, t}}; epics = [{id, name, desc}] for the page's epic panel.",
+    "file": null,
+    "title": null,
+    "store": { "root": null, "closed": null },
+    "stageLabels": { "0": "Triage", "1": "Design", "2": "Recon", "3": "Spec", "4": "Test plan", "4b": "Build plan", "5": "QA", "6": "Engineer", "7": "Ship" },
+    "columns": [
+      { "id": "todo", "label": "To Do", "stages": ["todo"], "actor": "-", "defaultStage": "todo" },
+      { "id": "triage", "label": "Triage", "stages": ["0"], "actor": "Orchestrator", "defaultStage": "0" },
+      { "id": "spec", "label": "Design & Spec", "stages": ["1", "2", "3"], "actor": "PO approval", "defaultStage": "3" },
+      { "id": "qa", "label": "Test plan & QA", "stages": ["4", "4b", "5"], "actor": "QA", "defaultStage": "4" },
+      { "id": "eng", "label": "Engineer", "stages": ["6"], "actor": "Engineer", "defaultStage": "6" },
+      { "id": "ship", "label": "Validate & Ship", "stages": ["7"], "actor": "Validation", "defaultStage": "7" },
+      { "id": "done", "label": "Done", "stages": ["done"], "actor": "-", "defaultStage": "done" }
+    ],
+    "dispatch": { "qa": "5", "engineer": "6", "validation": "7" },
+    "meta": null,
+    "epics": []
+  },
   "proseCheck": {
     "_comment": "SDD-PROP-09 spec form (prose_check). mode: warn (default) | strict (violations FAIL; migrate-on-contact) | off. maxParaShare = max fraction of a shard's words in paragraph text; maxParaWords = longest single paragraph; minWords = shards below this skip the share test (the paragraph test still applies); excludeGlobs = generated shards to ignore.",
     "mode": "warn",

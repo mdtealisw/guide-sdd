@@ -6,12 +6,13 @@
 > - Origin: the 4x project's session practice (2026-07-14); the module, the DoD lane-reconciliation item
 >   and INIT memory seeding were ratified in v1.7 (`SDD-PROP-01/03/05`).
 
-## The three commands
+## The commands
 
 | Command | Does |
 |---|---|
 | `/wrap` | End-of-session externalization pass: reconcile every agent lane (LANDED(hash)/DIED), land-or-park the tree, update the backlog, bank memories, write spec debt, **overwrite** the HANDOFF card, report — then "Cleared for /clear." |
 | `/stash [-f] <name>` · `/stash -l` | Freeze the **current task** to a named resume pack (richer than HANDOFF) so a `/clear` loses nothing; list with `-l`. |
+| `/board <verb>` | The stage board (`board/README.md`): one `node sdd/board/board.mjs` call per verb — `get`, `add`, `stage`, `assign`, `done`, `check`, `snapshot`. Optional, Mode B. |
 | `/unstash <name>` | Resume a stashed task: wrap any live context first, reconstruct the working set at pinned locations, re-dispatch recorded agent briefs, pop-with-archive, continue. |
 
 ## Capability tier (`host-adapter.md`)

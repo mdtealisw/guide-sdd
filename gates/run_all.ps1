@@ -4,8 +4,8 @@
 #
 # Order (Stage 7 ship):
 #   link_check -> prose_check -> coverage_check -> test_edit_ban -> structure_check -> static_check
-#     -> suite_green -> constitution_lint* -> seam_conformance* -> qa_import_ban* -> mutation_check
-#     -> fold_check
+#     -> suite_green -> constitution_lint* -> seam_conformance* -> qa_import_ban* -> board_check
+#     -> mutation_check -> fold_check
 #     -> suite_green (re-run)
 # (*) project gates run only if their concrete (non-template) .ps1 script exists.
 # structure_check runs its -Frozen half (approved diagram unchanged vs the frozen base) only on
@@ -179,6 +179,10 @@ if (Test-Path -LiteralPath (Join-Path $HereDir 'qa_import_ban.ps1')) {
 } else {
     Write-Output "== qa_import_ban == (skipped: cp qa_import_ban.template.ps1 qa_import_ban.ps1)"
 }
+
+Write-Output "== board_check =="
+Invoke-Gate 'board_check.ps1' @('-Config', $CFG)
+if ($LASTEXITCODE -ne 0) { Fail 'board_check' }
 
 Write-Output "== mutation_check =="
 $mcArgs = @('-Config', $CFG)

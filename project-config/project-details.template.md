@@ -77,6 +77,8 @@ Both modes satisfy constitution §8; only storage differs.
 | CL-9 | **Claim** (worker stamps before starting; only an unclaimed Ready item) | _a comment `claimed-by:<SDD_BOX_ID>` + timestamp_ | _a `claimed-by: <SDD_BOX_ID>` line on the entry_ |
 | CL-10 | **Ready-for-review state** (worker flags; PO box reviews + merges) | _e.g. Jira `Ready for Review` / a label_ | _a `status: review` line on the entry_ |
 | CL-11 | **Project memory directory** — session-lifecycle home (`session-lifecycle.md`), seeded at INIT: `MEMORY.md` index, `HANDOFF.md` (overwrite-only card), `stashes/` (+ `archive/`), `memory/`. Session state only — the backlog lives at CL-1. | _e.g. `docs/memory/`_ | _e.g. `docs/memory/`_ |
+| CL-12 | **Stage board** (optional, `sdd/board/README.md`) — `board.file` in gates config; live-view URL; who moves stages (orchestrator 0–4b via `/board stage`; the dispatch hook 5–7 from a `Board: <KEY>` brief line; `/board done` at CL-4) | _N/A — the tracker's own board (GUIDE adds the stage convention)_ | _e.g. `docs/memory/board.json`; http://127.0.0.1:8780 (Docker)_ |
+| CL-13 | **Teams** (optional, `sdd/box-roles.md` §Teams) — concurrent orchestrator sessions on one box, one team each | _N/A_ | _e.g. alpha, beta; a session takes its team from the PO's start prompt_ |
 
 > **Box loops:** worker poll ~15–30 min, PO poll ~30 min; `SDD_BOX_ID` + cadence are per-box (`box-role.local`). Workers never merge — they flag CL-10; the PO box owns the serialized merge. See `box-roles.md` §"Box loops & coordination".
 

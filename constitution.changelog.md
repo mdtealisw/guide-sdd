@@ -446,3 +446,18 @@ No invariant change; still ten.
   - A shard with no definitions at all falls back to the old rule (a pin on the clause-id line or the next one) and prints a NOTE.
   - **Mode B single-file backlogs resolve.** A unit resolves by a `<unit>*` file under `backlogRoot` (as before), or by a heading or anchor naming it inside any file there. `backlogRoot` may also name one backlog file. `UNRESOLVED-UNIT` now says what was searched, and so does a strict `resolveCmd` failure.
 - Smoke on both twins: a pin at the end of a multi-line HTML clause, a cross-referenced id, an unchanged unpinned clause, an edited unpinned clause, a single-file backlog, a heading in a backlog directory, and an unknown unit.
+
+## v1.17.0 — the stage board (per SDD-amend-v1.17.0, 2026-10-16)
+
+No invariant change; still ten. Upstreamed from the 4x adopter's board (closes #12), generalized.
+- **`board/` (optional, Mode B, node >= 18, built-ins only):**
+  - `board.mjs`: the CLI and shared module. `board.json` (path `board.file`) holds sprint membership, stage, team and a one-line note, one item per line in a fixed key order. Every write locks `board.json.lock`, re-reads, writes a temp file and renames it. Items stay in the backlog (`foldCheck.backlogRoot`), so titles and bodies are never copied. `done` closes the backlog item and marks the board item done in one run. `check [--fix]` reports drift; `prune <days>` leaves retention to the project.
+  - The backlog is a directory of item files (closed = a `shipped:` line, `#CL-4`) or one file of rows (`##`-`####` headings or `- ` bullets led by the unit-id; closed = a `shipped:` line, or the row is in `board.store.closed`). A line starting `SHIPPED ` also counts, matching the older Stage 7 wording.
+  - Stage ids are parsed from `PROCESS.md`'s Stage Index at run time; `board.stageLabels` and `board.columns` shape the board (default grouping: To Do, Triage, Design & Spec, Test plan & QA, Engineer, Validate & Ship, Done). Stage 7 stays one column.
+  - `serve.mjs` + `board.html`: a live view that runs as a standing site, with no Claude Code session needed. It has stage columns, teams, swimlanes, drag-and-drop, an issue drawer and a backlog tab, with updates by server-sent events. It binds loopback, refuses foreign Host and Origin headers, and never runs `done`. Hosting: `compose.yml` (one `docker compose up -d`, stock node image, repo bind-mounted) or `iis-setup.ps1` (ASP.NET Core Module, grants only the paths `board.mjs paths` names). A supervised server restarts on a code change; open pages reload when the page changes.
+  - `hook.mjs`: a dispatch brief with a `Board: <KEY>` line moves the item to its persona's stage (`board.dispatch`, default qa 5, engineer 6, validation 7). It never blocks.
+- **Plugin:** `hooks/board-dispatch.sh` (PreToolUse on Agent/Task; a no-op without node or a board) and the `board` skill. `commands/board.md` for other hosts.
+- **`board_check`** (sh/ps1 twins, no node): drift between board and backlog FAILs in `run_all`; unset `board.file` = "not configured". `--ship <KEY>` also requires the item done and closed, at Stage 7's record-ship step.
+- **Docs:** `box-roles.md` §Teams (several orchestrator sessions on one box); project-details `#CL-12` (board) and `#CL-13` (teams); the `Board: <KEY>` brief line (`stages/4b_buildplan.md` §3); Stage 7 step 4 now writes `shipped: <sha> <date>` as `#CL-4` does, with `/board done` + `board_check --ship`; INIT's optional board step; gate config `board` section.
+- **Tests:** `ci/board_test.sh` (CLI on both layouts, parallel writers, server, SSE, hook) runs in CI; `board_check` controls on both smoke twins.
+- Mode A ships no local board: the tracker is the board.

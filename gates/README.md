@@ -60,6 +60,7 @@ clone with no project runtime.
 | fold_check | `fold_check.ps1` / `.sh` | generic | every clause changed this ship carries a resolving provenance pin. A clause is its definition span (anchor or leading id to the next one); one pin anywhere in it counts, and ids cited in prose are not clauses. CI runs **`--strict`** | 7 |
 | static_check | `static_check.ps1` / `.sh` | generic | the project's linter / type checker / format check (`checkCmd`) passes, or its finding count stays at or under `staticCheck.baseline` (the brownfield ratchet); **`checkCmd` is mandatory** (unset = exit 2; `"none"` opts out on the record) | 6, 7 |
 | suite_green | `suiteCmd` wrapper | generic | the project suite exits 0; **`suiteCmd` is mandatory** (unset = exit 2, never a skip) | 6, 7 |
+| board_check | `board_check.ps1` / `.sh` | generic, **optional** | the stage board (`board.file`) and the Mode B backlog agree: no board item missing from the backlog, open but shipped, or done but still open; `--ship <KEY>` also requires KEY done on the board and closed in the backlog; unset = "not configured" (`board/README.md`) | 7 |
 | mutation_check | `mutation_check.ps1` / `.sh` | generic, **optional** | the suite kills enough planted faults: `mutation.cmd` exits 0, or its score ≥ `mutation.minScore`; `{base}` scopes it to the diff; unset = "not configured" | 7 |
 | constitution_lint | `constitution_lint.template.ps1` / `.sh` | **project** | project principle checks (e.g. no hardcoded UI strings) | 7 |
 | seam_conformance | `seam_conformance.template.ps1` / `.sh` | **project** | each Project Details §1 seam holds | 7 |
@@ -107,6 +108,7 @@ contract. Run the Windows (`pwsh …`) **or** the Linux–macOS (`sh …`) form,
   | seam_conformance | `pwsh gates/seam_conformance.ps1` | `sh gates/seam_conformance.sh` |
   | qa_import_ban | `pwsh gates/qa_import_ban.ps1` | `sh gates/qa_import_ban.sh` |
   | static_check | `pwsh gates/static_check.ps1` | `sh gates/static_check.sh` |
+  | board_check | `pwsh gates/board_check.ps1 [-Ship <KEY>]` | `sh gates/board_check.sh [--ship <KEY>]` |
   | mutation_check | `pwsh gates/mutation_check.ps1 [-Base <frozen-sha>]` | `sh gates/mutation_check.sh [--base <frozen-sha>]` |
 
   Every gate takes a config override: `-Config <path>` / `--config <path>` (default
@@ -198,7 +200,7 @@ contract. Run the Windows (`pwsh …`) **or** the Linux–macOS (`sh …`) form,
   ```
   link_check → prose_check → coverage_check → test_edit_ban → structure_check → static_check
              → suite_green → constitution_lint* → seam_conformance* → qa_import_ban*
-             → mutation_check → fold_check → suite_green (re-run)
+             → board_check → mutation_check → fold_check → suite_green (re-run)
   ```
   (`structure_check --frozen` precedes the trace on the persona route's `--pre-fold` pass only.)
   - **Windows:** `pwsh gates/run_all.ps1 [baseRef] [-PreFold] [-Mechanical] [-Strict]`
@@ -244,7 +246,8 @@ in a script.
 | `checkCmd` | the lint + type-check + format-check command, from `#TOOL-7`; **mandatory** (`"none"` opts out on the record). |
 | `staticCheck` | `findingRegex` + `baseline` (the ratchet), `fileCmd` + `fileGlobs` (the plugin's per-edit loop; default `paths.code`). |
 | `mutation` | optional: `cmd` (from `#TOOL-8`; `{base}` = the QA-frozen SHA), `scoreRegex`, `minScore`. |
-| `unitIdRegex` | what a changelog unit-id looks like — Jira key (Mode A) or backlog id (Mode B). Read by fold_check; otherwise mode-blind. |
+| `unitIdRegex` | what a changelog unit-id looks like — Jira key (Mode A) or backlog id (Mode B). Read by fold_check and the stage board; otherwise mode-blind. |
+| `board` | optional stage board: `file` (unset = off), `title`, `store.root` / `store.closed`, `stageLabels`, `columns`, `dispatch` (persona → stage for the plugin hook), `meta`, `epics` (`board/README.md`). Read by `board_check` and `board/*.mjs`. |
 | `proseCheck` | `prose_check` tunables: `mode` (warn / strict / off), `maxParaShare`, `maxParaWords`, `minWords`, `excludeGlobs[]` (see above). |
 | `constitutionRules[]` / `seamRules[]` | project-gate rule arrays (see schema). |
 | `qaImportRules[]` | `qa_import_ban`'s rule array, same shape — typically `must_not_match` an import of a production-internal namespace/path over the QA test glob. **Why:** QA-blind independence is otherwise honor-system; this catches its structural half. |

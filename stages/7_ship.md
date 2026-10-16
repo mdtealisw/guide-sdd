@@ -138,8 +138,10 @@ shipped units)` is enforced **here, at ship time**, identically in changelog Mod
    the item beside the per-slice lines. Cost, beside `metrics.md`, never instead.
 3. **Archive, don't delete** the transient working spec **and the build plan** (`git mv` to
    `spec/archive/`).
-4. Record the ship-SHA back onto the changelog item per `project-details.md#CL-N` (transition Done + SHA
-   comment in Mode A; appended `SHIPPED <sha> <date>` line in Mode B).
+4. Record the ship-SHA back onto the changelog item per `project-details.md#CL-4` (transition Done + SHA
+   comment in Mode A; an appended `shipped: <sha> <date>` line in Mode B). **Stage board** (`#CL-12`):
+   `/board done <KEY> "<repo> <sha>"` writes that line AND marks the board item done in one run; then
+   `board_check --ship <KEY>` must PASS.
 5. Recompile `spec/index.html` via the `project-details.md#SPEC-3` build command so the whole-corpus
    view never goes stale.
 

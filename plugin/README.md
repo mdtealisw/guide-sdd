@@ -13,6 +13,7 @@ Install: `/plugin marketplace add mdtealvl/guide-sdd` then `/plugin install guid
 | `/sdd-gates` | `run_all` for this OS, output filtered to verdict lines (dispatch frugality). |
 | `/sdd-persona` | Sets `sdd/.persona` (`engineer` / `qa` / `clear`) read by the hook below. |
 | `/wrap` `/stash` `/unstash` | The session-lifecycle commands from `commands/`, as skills. |
+| `/board` | The stage board (`sdd/board/README.md`): one `node sdd/board/board.mjs` call per verb. |
 
 **Hook — persona guard** (`hooks/persona-guard.sh`; persona from the hook input's `agent_type`, else env
 `SDD_PERSONA`, else `sdd/.persona` — see PG.1 below), four passes:
@@ -32,6 +33,11 @@ proof: the Stage-7 `test_edit_ban` and `structure_check --frozen` gates diff the
 `staticCheck.fileGlobs` (default `paths.code`), with `{file}` as the root-relative path. Findings go back to
 the agent at once (exit 2); the edit stands. Silent when unset, when jq is missing, or when the file is
 clean. The fast loop only: `static_check` in the bank is the proof. Tested by `ci/hook_test.sh`.
+
+**Hook — board dispatch** (`hooks/board-dispatch.sh`, PreToolUse on Agent/Task). Hands the input to the
+vendored `sdd/board/hook.mjs`: a dispatch brief with a `Board: <KEY>` line moves that item to the persona's
+stage (`board.dispatch`; default qa 5, engineer 6, validation 7) and returns `board: KEY -> S5 QA` as
+context. Never blocks; a no-op without node, the spine's board, or a board file. Tested by `ci/board_test.sh`.
 
 **Hook — update check** (`hooks/update-check.sh`, SessionStart on `startup`). In a repo with
 `sdd/.sdd-manifest.json` it runs the bundled `install.sh check --cached` — at most one release lookup a day,

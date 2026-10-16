@@ -227,6 +227,38 @@ names "fold_check (unresolved)" "UNRESOLVED-UNIT BL-20261006-99  (no heading or 
 twin "fold_check (unresolved)" "$LAST_OUT" "$LAST_RC" gates/fold_check.ps1 -Config fc.smoke.json -Base $FB2
 git reset -q --hard "$FB"; rm -f fc.smoke.json
 
+# board_check (#12): the stage board and the Mode B backlog agree. Unset = not configured; a directory
+# backlog (shipped: line) and a single-file backlog (rows + closed file) each catch every drift kind.
+expect 0 "board_check PASS: not configured" sh gates/board_check.sh --config $CFG
+names "board_check (off)" "not configured"
+twin "board_check (off)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config $CFG
+mkdir -p bk.smoke/items
+printf '# DEMO-1 a\nbody\n' > bk.smoke/items/DEMO-1-a.md
+printf '# DEMO-2 b\nshipped: abc1234 2026-10-01\n' > bk.smoke/items/DEMO-2-b.md
+printf '# DEMO-3 c\n' > bk.smoke/items/DEMO-3-c.md
+printf '{"teams":[],"items":[\n{"k":"DEMO-1","stage":"5"},\n{"k":"DEMO-2","stage":"done"}\n]}\n' > bk.smoke/board.json
+jq '.board.file = "bk.smoke/board.json" | .board.store.root = "bk.smoke/items"' $CFG > bk.smoke/cfg.json
+expect 0 "board_check PASS: board agrees with a directory backlog" sh gates/board_check.sh --config bk.smoke/cfg.json
+twin "board_check (dir)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config bk.smoke/cfg.json
+printf '{"teams":[],"items":[\n{"k":"DEMO-1","stage":"done"},\n{"k":"DEMO-2","stage":"6"},\n{"k":"DEMO-9","stage":"0"}\n]}\n' > bk.smoke/board.json
+expect 1 "board_check FAIL: done-but-open, open-but-shipped, not in backlog" sh gates/board_check.sh --config bk.smoke/cfg.json
+names "board_check (drift 1)" "DRIFT DEMO-1  board-done but the backlog item is still open"
+names "board_check (drift 2)" "DRIFT DEMO-2  board-open but shipped in the backlog"
+names "board_check (drift 9)" "DRIFT DEMO-9  on board but not in the backlog"
+twin "board_check (drift)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config bk.smoke/cfg.json
+printf '# Backlog\n## Open\n- **[DEMO-1]** first\n  detail\n- **[DEMO-2]** second\n  shipped: abc 2026-10-01\n## DEMO-3 heading row\ntext\n' > bk.smoke/backlog.md
+printf -- '- **[DEMO-4]** old\n' > bk.smoke/done.md
+printf '{"teams":[],"items":[\n{"k":"DEMO-1","stage":"7"},\n{"k":"DEMO-2","stage":"done"},\n{"k":"DEMO-3","stage":"3"},\n{"k":"DEMO-4","stage":"done"}\n]}\n' > bk.smoke/board.json
+jq '.board.file = "bk.smoke/board.json" | .board.store.root = "bk.smoke/backlog.md" | .board.store.closed = "bk.smoke/done.md"' $CFG > bk.smoke/cfg.json
+expect 0 "board_check PASS: board agrees with a single-file backlog" sh gates/board_check.sh --config bk.smoke/cfg.json
+twin "board_check (file)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config bk.smoke/cfg.json
+expect 1 "board_check --ship FAIL: shipped item still open" sh gates/board_check.sh --config bk.smoke/cfg.json --ship DEMO-1
+names "board_check (ship)" "DRIFT DEMO-1  shipped item not done on the board (stage 7)"
+twin "board_check (ship)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config bk.smoke/cfg.json -Ship DEMO-1
+expect 0 "board_check --ship PASS: done and closed" sh gates/board_check.sh --config bk.smoke/cfg.json --ship DEMO-4
+twin "board_check (ship ok)" "$LAST_OUT" "$LAST_RC" gates/board_check.ps1 -Config bk.smoke/cfg.json -Ship DEMO-4
+rm -rf bk.smoke
+
 # Rule engine (constitution_lint / seam_conformance / qa_import_ban): a regex is matched line by line
 # in both twins - ^ anchors each line, and no match spans a newline. Untracked scratch files, removed
 # before the freeze.

@@ -43,7 +43,8 @@ share no working files); the Orchestrator concatenates lane ledgers at merge for
 Its stage file + the shard-manifest **slice** (its clause-IDs' shards only) + the ledger rows **for its
 audience** + the pinned, output-filtered gate commands (`#TOOL-6`) + its budget. Audience: QA gets
 `qa` rows only; the Engineer `eng` + `any`; **Validation gets no ledger rows** — the diff and the
-clauses are its whole world (`stages/7_ship.md` §2, invariant 3).
+clauses are its whole world (`stages/7_ship.md` §2, invariant 3). With a stage board (`#CL-12`), every
+brief carries one line `Board: <KEY>`: the dispatch hook moves the item to that persona's stage.
 
 ### 4. Ledger — append-only, machine-read by `gates/token_ledger.*`
 

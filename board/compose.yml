@@ -1,0 +1,21 @@
+# GUIDE SDD stage board - live view as a standing container (no Claude Code session needed).
+#   docker compose -f sdd/board/compose.yml up -d      ->  http://127.0.0.1:8780
+# The stock Node image runs the vendored server against the repo, bind-mounted; nothing is built.
+# BOARD_REPO = repo root relative to this file (default ../..), SDD_DIR = the spine dir in it (default sdd),
+# BOARD_PORT = host port (default 8780). Published on loopback only; to serve other hosts, put a proxy in
+# front and name it in BOARD_ALLOWED_HOSTS (the server refuses unknown Host headers).
+name: guide-board
+services:
+  board:
+    image: node:22-alpine
+    working_dir: /repo
+    command: ["node", "${SDD_DIR:-sdd}/board/serve.mjs", "--host", "0.0.0.0", "--port", "8780"]
+    environment:
+      BOARD_SUPERVISED: "1"
+      BOARD_ALLOWED_HOSTS: "${BOARD_ALLOWED_HOSTS:-}"
+    user: "${BOARD_UID:-1000}:${BOARD_GID:-1000}"
+    volumes:
+      - "${BOARD_REPO:-../..}:/repo"
+    ports:
+      - "127.0.0.1:${BOARD_PORT:-8780}:8780"
+    restart: unless-stopped

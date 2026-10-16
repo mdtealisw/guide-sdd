@@ -1,6 +1,6 @@
 # GUIDE SDD — Gated, Unified, Intent-Driven Engineering
 
-> **v1.16.2 — 2026-10-16.** A reusable, token-efficient, spec-first / persona-split development
+> **v1.17.0 — 2026-10-16.** A reusable, token-efficient, spec-first / persona-split development
 > method that drops into large, multi-developer projects worked by humans **and** AI agents. It
 > merges two mature in-house practices (Mistwright's *How We Work*, Polars' *How To Develop*) with
 > the published SOTA into one copyable **spine** + a small, indexed **per-project surface**.
@@ -451,6 +451,21 @@ pin at the end of a multi-line clause covers it. A clause-id cited in prose is n
 clauses whose lines changed since the base need a pin. In Mode B a unit also resolves by a heading or
 anchor inside a backlog file, and `backlogRoot` may name a single backlog file. An unresolved unit
 says what was searched. Full record in `constitution.changelog.md`.
+
+### v1.17.0 Amendment — the stage board (2026-10-16)
+
+No invariant change; still ten. **Stage board** (closes #12; optional, Mode B): a sprint board whose
+columns are GUIDE's stages, so it shows whose turn each item is and which session owns it.
+- `sdd/board/`: a git-tracked `board.json` (membership, stage, team, note; the backlog stays the item
+  store), a one-line-per-call CLI with a locked writer, and a live page served as a standing site
+  (one Docker command, or the IIS script). Node ≥ 18, built-ins only, and only for the board.
+- Stage ids come from `PROCESS.md`'s Stage Index; `board` in the gate config sets labels and columns.
+- `/board` command and plugin skill; a plugin hook moves an item to QA, Engineer or Validation when that
+  persona is dispatched with a `Board: <KEY>` brief line.
+- **`board_check`** (sh/ps1, in `run_all`): board and backlog agree; `--ship <KEY>` at record-ship.
+- Teams: several orchestrator sessions on one box, one team each (`box-roles.md`, `#CL-12`/`#CL-13`).
+- **On update:** nothing to do; the board is off until `board.file` is set.
+Full record in `constitution.changelog.md`.
 
 ## Map to the source practices
 

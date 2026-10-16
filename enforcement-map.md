@@ -99,8 +99,9 @@ Green boxes close on a gate; amber boxes close on a recorded human decision.
 
 | Check | Kind | Why this kind |
 |---|---|---|
-| `run_all --pre-fold` — link → prose → coverage → test_edit_ban\* → structure → static → suite → constitution_lint† → seam_conformance† → qa_import_ban† → mutation‡ (fold_check skipped) | Gate helper running gates | One fail-fast bank, so nothing is forgotten. \*Persona route only. †Only when the project copied the template and wrote rules. ‡Only when `mutation.cmd` is set. |
+| `run_all --pre-fold` — link → prose → coverage → test_edit_ban\* → structure → static → suite → constitution_lint† → seam_conformance† → qa_import_ban† → board_check → mutation‡ (fold_check skipped) | Gate helper running gates | One fail-fast bank, so nothing is forgotten. \*Persona route only. †Only when the project copied the template and wrote rules. ‡Only when `mutation.cmd` is set. |
 | `constitution_lint` / `seam_conformance` — the project's own principles and seams | Gate (project rules) | Project rules as rows: regex over the tree, or `kind: command` to run a real architecture checker. One engine, no per-project script edits. |
+| `board_check` — the stage board and the Mode B backlog agree (optional; `--ship <KEY>` at record-ship) | Gate | A second store drifts within a day; `board.mjs done` closes both in one run and the gate catches every other path. |
 | `mutation_check` — the suite kills enough planted faults (optional) | Gate | Red-first proves tests fail without code, not that they catch wrong code. Survivors in changed code are Validation findings, class `test`, routed to QA. |
 | Fresh Validation — four lenses, one verdict, against the full diff, spec, structure shard and constitution | Human / Validation | **Green is necessary, not sufficient.** A context that did not build the thing checks intent. |
 | Classify and route Validation's findings (spec / code / test / ...), decline cap 3 | Human (Orchestrator) | Which layer is wrong is judgement; the routing table makes it repeatable. |

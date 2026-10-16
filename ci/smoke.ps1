@@ -209,6 +209,37 @@ try {
     Names 'fold_check (unresolved)' 'UNRESOLVED-UNIT BL-20261006-99  (no heading or anchor naming it in docs/backlog.md)'
     git reset -q --hard $fb; Remove-Item -Force "$proj/fc.smoke.json" -ErrorAction SilentlyContinue
 
+    # board_check (#12): the stage board and the Mode B backlog agree. Unset = not configured; a directory
+    # backlog (shipped: line) and a single-file backlog (rows + closed file) each catch every drift kind.
+    Expect 0 'board_check PASS: not configured' @('gates/board_check.ps1', '-Config', $cfg)
+    Names 'board_check (off)' 'not configured'
+    New-Item -ItemType Directory -Force "$proj/bk.smoke/items" | Out-Null
+    [IO.File]::WriteAllText("$proj/bk.smoke/items/DEMO-1-a.md", "# DEMO-1 a`nbody`n", $utf8)
+    [IO.File]::WriteAllText("$proj/bk.smoke/items/DEMO-2-b.md", "# DEMO-2 b`nshipped: abc1234 2026-10-01`n", $utf8)
+    [IO.File]::WriteAllText("$proj/bk.smoke/items/DEMO-3-c.md", "# DEMO-3 c`n", $utf8)
+    $bkb = "$proj/bk.smoke/board.json"
+    [IO.File]::WriteAllText($bkb, "{`"teams`":[],`"items`":[`n{`"k`":`"DEMO-1`",`"stage`":`"5`"},`n{`"k`":`"DEMO-2`",`"stage`":`"done`"}`n]}`n", $utf8)
+    $bkObj = Get-Content $cfg -Raw | ConvertFrom-Json
+    $bkObj | Add-Member -Force -NotePropertyName board -NotePropertyValue ([pscustomobject]@{ file = 'bk.smoke/board.json'; store = [pscustomobject]@{ root = 'bk.smoke/items'; closed = $null } })
+    [IO.File]::WriteAllText("$proj/bk.smoke/cfg.json", ($bkObj | ConvertTo-Json -Depth 10), $utf8)
+    Expect 0 'board_check PASS: board agrees with a directory backlog' @('gates/board_check.ps1', '-Config', 'bk.smoke/cfg.json')
+    [IO.File]::WriteAllText($bkb, "{`"teams`":[],`"items`":[`n{`"k`":`"DEMO-1`",`"stage`":`"done`"},`n{`"k`":`"DEMO-2`",`"stage`":`"6`"},`n{`"k`":`"DEMO-9`",`"stage`":`"0`"}`n]}`n", $utf8)
+    Expect 1 'board_check FAIL: done-but-open, open-but-shipped, not in backlog' @('gates/board_check.ps1', '-Config', 'bk.smoke/cfg.json')
+    Names 'board_check (drift 1)' 'DRIFT DEMO-1  board-done but the backlog item is still open'
+    Names 'board_check (drift 2)' 'DRIFT DEMO-2  board-open but shipped in the backlog'
+    Names 'board_check (drift 9)' 'DRIFT DEMO-9  on board but not in the backlog'
+    [IO.File]::WriteAllText("$proj/bk.smoke/backlog.md", "# Backlog`n## Open`n- **[DEMO-1]** first`n  detail`n- **[DEMO-2]** second`n  shipped: abc 2026-10-01`n## DEMO-3 heading row`ntext`n", $utf8)
+    [IO.File]::WriteAllText("$proj/bk.smoke/done.md", "- **[DEMO-4]** old`n", $utf8)
+    [IO.File]::WriteAllText($bkb, "{`"teams`":[],`"items`":[`n{`"k`":`"DEMO-1`",`"stage`":`"7`"},`n{`"k`":`"DEMO-2`",`"stage`":`"done`"},`n{`"k`":`"DEMO-3`",`"stage`":`"3`"},`n{`"k`":`"DEMO-4`",`"stage`":`"done`"}`n]}`n", $utf8)
+    $bkObj.board.store.root = 'bk.smoke/backlog.md'
+    $bkObj.board.store.closed = 'bk.smoke/done.md'
+    [IO.File]::WriteAllText("$proj/bk.smoke/cfg.json", ($bkObj | ConvertTo-Json -Depth 10), $utf8)
+    Expect 0 'board_check PASS: board agrees with a single-file backlog' @('gates/board_check.ps1', '-Config', 'bk.smoke/cfg.json')
+    Expect 1 'board_check -Ship FAIL: shipped item still open' @('gates/board_check.ps1', '-Config', 'bk.smoke/cfg.json', '-Ship', 'DEMO-1')
+    Names 'board_check (ship)' 'DRIFT DEMO-1  shipped item not done on the board (stage 7)'
+    Expect 0 'board_check -Ship PASS: done and closed' @('gates/board_check.ps1', '-Config', 'bk.smoke/cfg.json', '-Ship', 'DEMO-4')
+    Remove-Item -Recurse -Force "$proj/bk.smoke"
+
     # Rule engine: a regex is matched line by line (the sh twin's grep -E semantics) - ^ anchors each
     # line, and no match spans a newline. Untracked scratch files, removed before the freeze.
     New-Item -ItemType Directory -Force "$proj/notes" | Out-Null
