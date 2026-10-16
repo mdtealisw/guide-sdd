@@ -6,15 +6,21 @@
 # touched by this change is pinned (§X per <unit-id>, YYYY-MM-DD) and the unit-id resolves.
 #
 # Resolution of <unit-id>:
-#   * Mode B (default): a backlog file named <unit-id>* exists under backlogRoot.
+#   * Mode B (default): under foldCheck.backlogRoot, a file or dir named <unit-id>*, or a
+#     heading / anchor (id=, name=, {#..}) naming the unit inside any file. backlogRoot may
+#     also name a single backlog file (one heading per item).
 #   * Mode A: if foldCheck.resolveCmd is set ({unit} substituted) it is run; exit 0 = resolves.
-#     Offline / no resolver -> degrades to "syntactically valid unit-id" + a NOTE.
+#   * Neither a resolver nor backlogRoot on disk -> "syntactically valid unit-id" + a NOTE.
 #
-# Scope = spec shards changed since baseRef (git diff). For each NEW or CHANGED clause
-# line, require a pin on it or the line directly after.
+# A clause is its DEFINITION SPAN: from the line that defines it (an id="X.N" / name= /
+# {#X.N} anchor, or a Markdown heading / list / table / bold line that starts with the id)
+# up to the next definition or heading. A clause-id merely cited in prose defines nothing.
+# A clause is checked when its span overlaps a line changed since baseRef (git diff -U0),
+# and one pin anywhere in the span covers it. A shard with no definitions at all falls
+# back to every clause-id line (pin on it or the next line), with a NOTE.
 #
-# FAIL CLOSED if git present but base unresolvable (exit 2). git-absent -> all shards + NOTE.
-# Exit 0 PASS, 1 FAIL, 2 config/usage error.
+# FAIL CLOSED if git present but base unresolvable (exit 2). git-absent -> all clauses of
+# all shards + NOTE. Exit 0 PASS, 1 FAIL, 2 config/usage error.
 #
 # -Strict: when a resolver IS configured (foldCheck.resolveCmd) but ERRORS or returns
 # non-zero, treat the unit as UNRESOLVED (FAIL) instead of degrading to "syntactic pin +
@@ -57,9 +63,13 @@ if ($cfg.PSObject.Properties.Name -contains 'paths' -and $cfg.paths -and ($cfg.p
 $clausePattern = Get-CfgValue $cfg 'clauseIdRegex' '\b[A-Z]{2,}\.\d+\b'
 $unitPattern   = Get-CfgValue $cfg 'unitIdRegex' '\b[A-Z]+-\d+\b'
 $clauseRe = [regex]$clausePattern
-$pinRe = [regex]('\bper\s+(' + $unitPattern + ')\s*,\s*\d{4}-\d{2}-\d{2}')
+$clauseFullRe = [regex]('^(?:' + $clausePattern + ')$')
+$pinRe = [regex]('\bper\s+(?<unit>' + $unitPattern + ')\s*,\s*(?<date>\d{4}-\d{2}-\d{2})')
+# Definition forms: id= / name= anchors, {#..}, or a heading / list / table / bold line led by the id.
+$anchorRes = @([regex]'(?:id|name)\s*=\s*(?:"([^"]*)"|''([^'']*)'')', [regex]'\{#([^}\s]+)\}')
+$leadRe = [regex]('^[ \t]*(?:#+[ \t]+|[-*+][ \t]+|[0-9]+[.)][ \t]+|\|[ \t]*)?[*_]*(?<id>' + $clausePattern + ')')
+$headingRe = [regex]'^[ \t]*#+[ \t]|<[hH][1-6][ \t>]'
 
-# changed_spec_files: shards changed vs base (fall back to all shards if git unavailable).
 function Get-NormPath([string]$p) { return ($p -replace '\\', '/') }
 
 $allShardsList = Expand-Globs $specGlob
@@ -73,27 +83,44 @@ function Invoke-GitDiff([string[]]$gitArgs) {
     return $null
 }
 
-$files = @()
-if (-not $gitAvailable) {
+# changed_lines: path -> HashSet[int] of new-side lines changed vs base (git diff -U0).
+# A pure deletion marks the lines on both sides of the cut. Git absent -> ALL.
+$allMode = $false
+$changed = @{}
+$diffOut = $null
+if ($gitAvailable) {
+    $diffArgs = @('-c', 'core.quotePath=false', 'diff', '-U0', '--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/')
+    $diffOut = Invoke-GitDiff ($diffArgs + "$base...HEAD")
+    if ($null -eq $diffOut) { $diffOut = Invoke-GitDiff ($diffArgs + "$base") }
+}
+if ($null -eq $diffOut) {
     Write-Output "NOTE fold_check: git unavailable - checking ALL spec shards."
+    $allMode = $true
+} else {
+    $cur = ''
+    foreach ($raw in $diffOut) {
+        $line = [string]$raw
+        if ($line.StartsWith('+++ ')) {
+            $cur = $line.Substring(4) -replace "`t$", '' -replace '^"', '' -replace '"$', ''
+            if ($cur -eq '/dev/null') { $cur = '' } else { $cur = $cur -replace '^b/', '' }
+            continue
+        }
+        if ($cur -and $line.StartsWith('@@ ')) {
+            $hm = [regex]::Match($line, '\+(\d+)(?:,(\d+))?')
+            if (-not $hm.Success) { continue }
+            $c = [int]$hm.Groups[1].Value
+            $d = if ($hm.Groups[2].Success) { [int]$hm.Groups[2].Value } else { 1 }
+            if (-not $changed.ContainsKey($cur)) { $changed[$cur] = New-Object 'System.Collections.Generic.HashSet[int]' }
+            if ($d -eq 0) { [void]$changed[$cur].Add($c); [void]$changed[$cur].Add($c + 1) }
+            else { for ($k = $c; $k -lt $c + $d; $k++) { [void]$changed[$cur].Add($k) } }
+        }
+    }
+}
+
+if ($allMode) {
     $files = @($allShards | Sort-Object)
 } else {
-    $out = Invoke-GitDiff @('diff', '--name-only', "$base...HEAD")
-    if ($null -eq $out) {
-        $out = Invoke-GitDiff @('diff', '--name-only', "$base")
-    }
-    if ($null -eq $out) {
-        Write-Output "NOTE fold_check: git unavailable - checking ALL spec shards."
-        $files = @($allShards | Sort-Object)
-    } else {
-        $changed = New-Object 'System.Collections.Generic.HashSet[string]'
-        foreach ($line in $out) {
-            if ($null -eq $line) { continue }
-            $t = ([string]$line).Trim()
-            if ($t) { [void]$changed.Add((Get-NormPath $t)) }
-        }
-        $files = @($changed | Where-Object { $allShards.Contains($_) } | Sort-Object)
-    }
+    $files = @($changed.Keys | Where-Object { $allShards.Contains($_) } | Sort-Object)
 }
 
 if ($files.Count -eq 0) {
@@ -101,29 +128,92 @@ if ($files.Count -eq 0) {
     exit 0
 }
 
+# Get-Defs: clause-ids this line DEFINES (anchors, then a leading id), in order, deduped.
+function Get-Defs([string]$line) {
+    $ids = New-Object System.Collections.Generic.List[string]
+    foreach ($re in $anchorRes) {
+        foreach ($m in $re.Matches($line)) {
+            $v = ''
+            for ($g = 1; $g -lt $m.Groups.Count; $g++) { if ($m.Groups[$g].Success) { $v = $m.Groups[$g].Value; break } }
+            if ($clauseFullRe.IsMatch($v) -and -not $ids.Contains($v)) { $ids.Add($v) }
+        }
+    }
+    $lm = $leadRe.Match($line)
+    if ($lm.Success) {
+        $v = $lm.Groups['id'].Value
+        if (-not $ids.Contains($v)) { $ids.Add($v) }
+    }
+    return ,$ids
+}
+
 $unpinned = New-Object System.Collections.Generic.List[object]
 $seenUnits = New-Object 'System.Collections.Generic.HashSet[string]'
+$fallbacks = New-Object System.Collections.Generic.List[string]
 
 foreach ($f in $files) {
-    $lines = Read-FileLines $f
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        $line = $lines[$i]
-        foreach ($m in $clauseRe.Matches($line)) {
-            $cid = $m.Value
-            $next = ''
-            if ($i + 1 -lt $lines.Count) { $next = $lines[$i + 1] }
-            $window = $line + $next
-            $pm = $pinRe.Match($window)
-            if (-not $pm.Success) {
-                $unpinned.Add([pscustomobject]@{ file = $f; cid = $cid })
-            } else {
-                [void]$seenUnits.Add($pm.Groups[1].Value)
-            }
+    $lines = @(Read-FileLines $f)
+    # Read-FileLines yields a trailing '' for a final newline; drop it so line counts match awk.
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines = @($lines[0..($lines.Count - 2)]) }
+    $n = $lines.Count
+    $cl = $null
+    if (-not $allMode) { $cl = $changed[$f] }
+    $defs = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $n; $i++) {
+        $ids = Get-Defs $lines[$i]
+        if ($ids.Count -gt 0) { $defs.Add([pscustomobject]@{ line = $i + 1; ids = $ids }) }
+    }
+    $fb = $false
+    if ($defs.Count -eq 0) {
+        for ($i = 0; $i -lt $n; $i++) {
+            $ids = New-Object System.Collections.Generic.List[string]
+            foreach ($m in $clauseRe.Matches($lines[$i])) { if (-not $ids.Contains($m.Value)) { $ids.Add($m.Value) } }
+            if ($ids.Count -gt 0) { $defs.Add([pscustomobject]@{ line = $i + 1; ids = $ids }); $fb = $true }
+        }
+        if ($fb) { $fallbacks.Add($f) }
+    }
+    $reported = New-Object 'System.Collections.Generic.HashSet[string]'
+    for ($k = 0; $k -lt $defs.Count; $k++) {
+        $s = $defs[$k].line
+        if ($fb) {
+            $e = [Math]::Min($s + 1, $n)
+        } else {
+            $e = if ($k + 1 -lt $defs.Count) { $defs[$k + 1].line - 1 } else { $n }
+            for ($j = $s + 1; $j -le $e; $j++) { if ($headingRe.IsMatch($lines[$j - 1])) { $e = $j - 1; break } }
+        }
+        $touched = $allMode
+        for ($j = $s; $j -le $e -and -not $touched; $j++) { if ($cl.Contains($j)) { $touched = $true } }
+        if (-not $touched) { continue }
+        $text = ($lines[($s - 1)..($e - 1)]) -join ' '
+        $best = ''; $bunit = ''
+        foreach ($pm in $pinRe.Matches($text)) {
+            $dt = $pm.Groups['date'].Value
+            if ($best -eq '' -or [string]::CompareOrdinal($dt, $best) -ge 0) { $best = $dt; $bunit = $pm.Groups['unit'].Value }
+        }
+        foreach ($cid in $defs[$k].ids) {
+            if ($bunit) { [void]$seenUnits.Add($bunit) }
+            elseif ($reported.Add($cid)) { $unpinned.Add([pscustomobject]@{ file = $f; cid = $cid }) }
         }
     }
 }
 
-# resolve each seen unit-id.
+foreach ($f in $fallbacks) {
+    Write-Output "NOTE fold_check: no clause definitions in $f - each clause-id line needs a pin on it or the next line."
+}
+
+# Test-NamesUnit: some file at/under $path has a heading or anchor naming $unit.
+function Test-NamesUnit([string]$unit, [string]$path) {
+    $wordRe = [regex]('(?<![A-Za-z0-9_])' + [regex]::Escape($unit) + '(?![A-Za-z0-9_])')
+    $anchors = @("id=""$unit""", "id='$unit'", "name=""$unit""", "name='$unit'", "{#$unit}")
+    foreach ($file in @(Get-ChildItem -LiteralPath $path -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        foreach ($line in (Read-FileLines $file.FullName)) {
+            if ($line -match '^[ \t]*#+[ \t]' -and $wordRe.IsMatch($line)) { return $true }
+            foreach ($a in $anchors) { if ($line.Contains($a)) { return $true } }
+        }
+    }
+    return $false
+}
+
+# resolve each seen unit-id: returns '' when it resolves, else the reason it did not.
 function Resolve-Unit([string]$unit, $cfg, [bool]$strict) {
     $fc = Get-CfgValue $cfg 'foldCheck' $null
     $cmd = $null
@@ -144,34 +234,42 @@ function Resolve-Unit([string]$unit, $cfg, [bool]$strict) {
             # Resolver could not even be launched / threw — treat like a non-zero result.
             $rc = 1
         }
-        if ($rc -eq 0) { return $true }
+        if ($rc -eq 0) { return '' }
         # Configured resolver errored or returned non-zero.
         #   strict     -> UNRESOLVED (FAIL): a broken/offline resolver cannot pass open.
         #   non-strict -> degrade to the syntactic pin + NOTE (local/offline convenience).
         if ($strict) {
-            [Console]::Out.WriteLine("FAIL fold_check: resolveCmd errored/non-zero for $unit - strict mode treats this as unresolved.")
-            return $false
+            [Console]::Out.WriteLine("FAIL fold_check: resolveCmd errored for $unit - strict mode treats this as unresolved.")
+            return 'resolveCmd did not resolve it'
         }
         [Console]::Out.WriteLine("NOTE fold_check: resolveCmd failed for $unit - accepting syntactic pin.")
-        return $true
+        return ''
     }
     $root = 'backlog'
     if ($fc) { $root = Get-CfgValue $fc 'backlogRoot' 'backlog' }
     if (Test-Path -LiteralPath $root -PathType Container) {
+        # Mode B: a file/dir named <unit>* directly under backlogRoot, or a heading/anchor in a file.
         $hits = @(Get-ChildItem -LiteralPath $root -Filter "$unit*" -Force -ErrorAction SilentlyContinue)
-        return ($hits.Count -gt 0)
+        if ($hits.Count -gt 0 -or (Test-NamesUnit $unit $root)) { return '' }
+        return "no $root/$unit* file and no heading or anchor naming it under $root/"
+    }
+    if (Test-Path -LiteralPath $root -PathType Leaf) {
+        # Mode B, single-file backlog: a heading/anchor naming the unit inside backlogRoot.
+        if (Test-NamesUnit $unit $root) { return '' }
+        return "no heading or anchor naming it in $root"
     }
     [Console]::Out.WriteLine("NOTE fold_check: no resolver and no $root/ - accepting syntactic pin for $unit.")
-    return $true
+    return ''
 }
 
-$unresolved = New-Object System.Collections.Generic.List[string]
+$unresolved = New-Object System.Collections.Generic.List[object]
 foreach ($unit in ($seenUnits | Sort-Object)) {
-    if (-not (Resolve-Unit $unit $cfg ([bool]$Strict))) { $unresolved.Add($unit) }
+    $why = Resolve-Unit $unit $cfg ([bool]$Strict)
+    if ($why) { $unresolved.Add([pscustomobject]@{ unit = $unit; why = $why }) }
 }
 
 if ($unpinned.Count -eq 0 -and $unresolved.Count -eq 0) {
-    Write-Output "PASS fold_check: $($files.Count) changed shard(s); all clauses pinned and resolved."
+    Write-Output "PASS fold_check: $($files.Count) changed shard(s); all changed clauses pinned and resolved."
     exit 0
 }
 
@@ -179,7 +277,7 @@ Write-Output "FAIL fold_check: $($unpinned.Count) unpinned clause(s), $($unresol
 foreach ($u in $unpinned) {
     Write-Output "  UNPINNED $($u.cid)  in $($u.file)  (add: (§... per <unit-id>, YYYY-MM-DD))"
 }
-foreach ($unit in $unresolved) {
-    Write-Output "  UNRESOLVED-UNIT $unit  (no backlog file / tracker entry)"
+foreach ($u in $unresolved) {
+    Write-Output "  UNRESOLVED-UNIT $($u.unit)  ($($u.why))"
 }
 exit 1

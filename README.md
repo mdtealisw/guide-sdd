@@ -1,6 +1,6 @@
 # GUIDE SDD — Gated, Unified, Intent-Driven Engineering
 
-> **v1.16.1 — 2026-10-13.** A reusable, token-efficient, spec-first / persona-split development
+> **v1.16.2 — 2026-10-16.** A reusable, token-efficient, spec-first / persona-split development
 > method that drops into large, multi-developer projects worked by humans **and** AI agents. It
 > merges two mature in-house practices (Mistwright's *How We Work*, Polars' *How To Develop*) with
 > the published SOTA into one copyable **spine** + a small, indexed **per-project surface**.
@@ -442,6 +442,15 @@ No invariant change; still ten. **`token_ledger`** (closes #11): a `|` in a ledg
 alternation like `'Pushing|Deploy'`, a pinned `string | null`) is written as `\|`. It no longer shifts the
 row's columns, so `verify` stops reporting a false STALE and `report` reads the right numbers. Ledgers
 written by 1.16.0 still read correctly. Full record in `constitution.changelog.md`.
+
+### v1.16.2 Amendment — fold_check reads whole clauses (2026-10-16)
+
+No invariant change; still ten. **`fold_check`** (closes #10): a clause is its whole definition, from
+its anchor (`id="X.N"`, `{#X.N}`, or a heading / list / table line led by the id) to the next one, so a
+pin at the end of a multi-line clause covers it. A clause-id cited in prose is not a clause. Only
+clauses whose lines changed since the base need a pin. In Mode B a unit also resolves by a heading or
+anchor inside a backlog file, and `backlogRoot` may name a single backlog file. An unresolved unit
+says what was searched. Full record in `constitution.changelog.md`.
 
 ## Map to the source practices
 

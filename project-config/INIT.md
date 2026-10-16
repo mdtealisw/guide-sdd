@@ -174,7 +174,8 @@ mkdir -p backlog                            # SKIP in Mode A (the tracker is the
      the bank says "not configured" and test strength stays unmeasured.
    - `unitIdRegex` — the changelog unit-id regex (from project-details `#CL-2`).
    - `foldCheck.backlogRoot` / `foldCheck.resolveCmd` — how `fold_check` resolves a pin's
-     `<unit-id>`. The fold step is otherwise changelog-mode-blind, so switching modes later touches
+     `<unit-id>` (Mode B: a `<unit-id>*` file, or a heading naming it, under `backlogRoot`; an existing
+     single-file backlog works by pointing `backlogRoot` at the file). The fold step is otherwise changelog-mode-blind, so switching modes later touches
      `foldCheck` + Project Details §4 only.
 2. For each project-specific gate you want enforced, copy the concrete script **for your OS** (so
    `run_all` can invoke it):

@@ -174,6 +174,41 @@ try {
     Expect 0 'token_ledger report with | in cells' @('gates/token_ledger.ps1', 'report', '-Plan', $lp, '-Config', $cfg)
     Remove-Item "$proj/$lp"
 
+    # fold_check (#10): a clause is its definition span. A pin at the end of a multi-line HTML clause
+    # covers an edit to its first line; a clause-id cited in prose is not a clause; an unchanged clause
+    # needs no pin; a Mode B backlog resolves a unit by a heading inside a file, or backlogRoot names
+    # one file. Fixture commits are reset away afterwards.
+    $fb = (git rev-parse HEAD)
+    $fcObj = Get-Content $cfg -Raw | ConvertFrom-Json
+    $fcObj.paths.spec = 'spec/**/*.body.html'
+    $fcObj.unitIdRegex = '\bBL-\d+-\d+\b'
+    $fcObj.foldCheck.backlogRoot = 'docs/backlog.md'
+    [IO.File]::WriteAllText("$proj/fc.smoke.json", ($fcObj | ConvertTo-Json -Depth 10), $utf8)
+    New-Item -ItemType Directory -Force "$proj/spec/fold", "$proj/docs" | Out-Null
+    $fold = "$proj/spec/fold/a.body.html"
+    [IO.File]::WriteAllText($fold, "<ul>`n<li id=`"DISC.3`"><strong>DISC.3</strong> - The system shall log a lock.</li>`n<li id=`"DISC.4`"><strong>DISC.4</strong> - Content of a locked thing is never sent,`n  not its page or record; see DISC.3 and EPI.3.`n  <em>(§DISC per BL-20261006-06, 2026-10-09)</em></li>`n</ul>`n", $utf8)
+    [IO.File]::WriteAllText("$proj/docs/backlog.md", "# Backlog`n`n## BL-20261006-06 lock content`nbody`n", $utf8)
+    git add -A ; git commit -q -m 'fold fixture'
+    $fb2 = (git rev-parse HEAD)
+    function Edit-Fold([string]$from, [string]$to) { [IO.File]::WriteAllText($fold, ([IO.File]::ReadAllText($fold)).Replace($from, $to), $utf8) }
+    Edit-Fold 'is never sent,' 'is never sent to a browser,'
+    git commit -q -am 'edit DISC.4 line 1'
+    Expect 0 'fold_check PASS: pin at the end of a multi-line clause, single-file backlog' @('gates/fold_check.ps1', '-Config', 'fc.smoke.json', '-Base', $fb2)
+    $fcObj.foldCheck.backlogRoot = 'docs'
+    [IO.File]::WriteAllText("$proj/fc.smoke.json", ($fcObj | ConvertTo-Json -Depth 10), $utf8)
+    Expect 0 'fold_check PASS: unit resolves by a heading under backlogRoot/' @('gates/fold_check.ps1', '-Config', 'fc.smoke.json', '-Base', $fb2)
+    Edit-Fold 'log a lock' 'log every lock'
+    git commit -q -am 'edit DISC.3'
+    Expect 1 'fold_check FAIL: changed clause without a pin' @('gates/fold_check.ps1', '-Config', 'fc.smoke.json', '-Base', $fb2)
+    Names 'fold_check (unpinned)' 'UNPINNED DISC.3'
+    if ($script:lastOut -like '*EPI.3*' -or $script:lastOut -like '*DISC.4*') { Write-Output 'FAIL  fold_check: flagged a cross-reference or a pinned clause'; $script:fails++ }
+    git reset -q --hard HEAD~1
+    Edit-Fold 'BL-20261006-06' 'BL-20261006-99'
+    git commit -q -am 'unknown unit'
+    Expect 1 'fold_check FAIL: unit with no backlog entry says why' @('gates/fold_check.ps1', '-Config', 'fc.smoke.json', '-Base', $fb2)
+    Names 'fold_check (unresolved)' 'UNRESOLVED-UNIT BL-20261006-99  (no heading or anchor naming it in docs/backlog.md)'
+    git reset -q --hard $fb; Remove-Item -Force "$proj/fc.smoke.json" -ErrorAction SilentlyContinue
+
     # Rule engine: a regex is matched line by line (the sh twin's grep -E semantics) - ^ anchors each
     # line, and no match spans a newline. Untracked scratch files, removed before the freeze.
     New-Item -ItemType Directory -Force "$proj/notes" | Out-Null

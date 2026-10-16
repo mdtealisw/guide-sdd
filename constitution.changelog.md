@@ -434,3 +434,15 @@ No invariant change; still ten.
 - `token_ledger` (closes #11): `add` wrote a grep pattern with a `|` (alternation) unescaped, so the row split into extra columns; `verify` read part of the pattern as the hash and reported a false STALE (exit 1), and `report` misread `full`/`est`. Now every free-text cell (by, for, path, range, note) is written with `|` as `\|` (tabs and newlines become blanks), and rows split on unescaped pipes only. Escaping is lossless (a literal `\|` round-trips), and GitHub's table rendering shows `\|` as a pipe. A `pin` note keeps its `|` instead of being rewritten to `/`. A 1.16.0 row with a raw `|` in `range` still reads: its last four cells are taken from the right.
 - `token_ledger.ps1` counted grep matches case-insensitively (`-match`), while the sh twin's `grep -E` is case-sensitive, so the twins wrote different `est` values. ps1 now uses `-cmatch`. The sh twin prints `STALE` and `LEDGER` lines with `printf`, so a pattern backslash is not read as an escape under dash.
 - Smoke: a grep alternation, a literal `\|`, a pin note with `|` and a legacy unescaped row all verify current and report identically on both twins.
+
+## v1.16.2 — fold_check reads whole clauses (per SDD-amend-v1.16.2, 2026-10-16)
+
+No invariant change; still ten.
+- `fold_check` (closes #10) reported false failures on HTML specs. The fixes:
+  - **A clause is its definition span.** It runs from the line that defines it (an `id=`/`name=` or `{#..}` anchor whose value is a clause-id, or a Markdown heading / list / table / bold line that starts with the id) to the next definition or heading. One pin anywhere in the span covers the clause, so a pin at the end of a multi-line `<li id="X.N">` counts. Before, the pin had to sit on the same line or the next one.
+  - **Only definitions are checked.** A clause-id cited in another clause's text (`... (DISC.8) ...`) defined nothing and was reported UNPINNED in a shard that never defined it.
+  - **Only changed clauses are checked.** The gate checked every clause-id in every changed shard. Now it reads `git diff -U0` against the base and checks only clauses whose span holds a changed line. A pure deletion inside a span counts as a change. With git absent, every clause is checked as before.
+  - **The newest pin decides.** When a span holds several pins, the unit with the latest date is resolved.
+  - A shard with no definitions at all falls back to the old rule (a pin on the clause-id line or the next one) and prints a NOTE.
+  - **Mode B single-file backlogs resolve.** A unit resolves by a `<unit>*` file under `backlogRoot` (as before), or by a heading or anchor naming it inside any file there. `backlogRoot` may also name one backlog file. `UNRESOLVED-UNIT` now says what was searched, and so does a strict `resolveCmd` failure.
+- Smoke on both twins: a pin at the end of a multi-line HTML clause, a cross-referenced id, an unchanged unpinned clause, an edited unpinned clause, a single-file backlog, a heading in a backlog directory, and an unknown unit.

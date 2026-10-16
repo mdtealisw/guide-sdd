@@ -198,6 +198,35 @@ expect 0 "token_ledger report with | in cells" sh gates/token_ledger.sh report -
 twin "token_ledger (report pipes)" "$LAST_OUT" "$LAST_RC" gates/token_ledger.ps1 report -Plan $LP -Config $CFG
 rm -f $LP spec/working/pipes.twin.md
 
+# fold_check (#10): a clause is its definition span. A pin at the end of a multi-line HTML clause
+# covers an edit to its first line; a clause-id cited in prose is not a clause; an unchanged clause
+# needs no pin; a Mode B backlog resolves a unit by a heading inside a file, or backlogRoot names
+# one file. Fixture commits are reset away afterwards.
+FB=$(git rev-parse HEAD)
+jq '.paths.spec = "spec/**/*.body.html" | .unitIdRegex = "\\bBL-\\d+-\\d+\\b" | .foldCheck.backlogRoot = "docs/backlog.md"' $CFG > fc.smoke.json
+mkdir -p spec/fold docs
+printf '<ul>\n<li id="DISC.3"><strong>DISC.3</strong> - The system shall log a lock.</li>\n<li id="DISC.4"><strong>DISC.4</strong> - Content of a locked thing is never sent,\n  not its page or record; see DISC.3 and EPI.3.\n  <em>(§DISC per BL-20261006-06, 2026-10-09)</em></li>\n</ul>\n' > spec/fold/a.body.html
+printf '# Backlog\n\n## BL-20261006-06 lock content\nbody\n' > docs/backlog.md
+git add -A >/dev/null && git commit -q -m "fold fixture"
+FB2=$(git rev-parse HEAD)
+sed -i 's/is never sent,/is never sent to a browser,/' spec/fold/a.body.html && git commit -q -am "edit DISC.4 line 1"
+expect 0 "fold_check PASS: pin at the end of a multi-line clause, single-file backlog" sh gates/fold_check.sh --config fc.smoke.json --base $FB2
+twin "fold_check (multi-line)" "$LAST_OUT" "$LAST_RC" gates/fold_check.ps1 -Config fc.smoke.json -Base $FB2
+jq '.foldCheck.backlogRoot = "docs"' fc.smoke.json > "$WORK/fc" && cp "$WORK/fc" fc.smoke.json
+expect 0 "fold_check PASS: unit resolves by a heading under backlogRoot/" sh gates/fold_check.sh --config fc.smoke.json --base $FB2
+twin "fold_check (heading in dir)" "$LAST_OUT" "$LAST_RC" gates/fold_check.ps1 -Config fc.smoke.json -Base $FB2
+sed -i 's/log a lock/log every lock/' spec/fold/a.body.html && git commit -q -am "edit DISC.3"
+expect 1 "fold_check FAIL: changed clause without a pin" sh gates/fold_check.sh --config fc.smoke.json --base $FB2
+names "fold_check (unpinned)" "UNPINNED DISC.3"
+case "$LAST_OUT" in *EPI.3*|*DISC.4*) echo "FAIL  fold_check: flagged a cross-reference or a pinned clause"; fails=$((fails+1));; esac
+twin "fold_check (unpinned)" "$LAST_OUT" "$LAST_RC" gates/fold_check.ps1 -Config fc.smoke.json -Base $FB2
+git reset -q --hard HEAD~1
+sed -i 's/BL-20261006-06/BL-20261006-99/' spec/fold/a.body.html && git commit -q -am "unknown unit"
+expect 1 "fold_check FAIL: unit with no backlog entry says why" sh gates/fold_check.sh --config fc.smoke.json --base $FB2
+names "fold_check (unresolved)" "UNRESOLVED-UNIT BL-20261006-99  (no heading or anchor naming it in docs/backlog.md)"
+twin "fold_check (unresolved)" "$LAST_OUT" "$LAST_RC" gates/fold_check.ps1 -Config fc.smoke.json -Base $FB2
+git reset -q --hard "$FB"; rm -f fc.smoke.json
+
 # Rule engine (constitution_lint / seam_conformance / qa_import_ban): a regex is matched line by line
 # in both twins - ^ anchors each line, and no match spans a newline. Untracked scratch files, removed
 # before the freeze.
